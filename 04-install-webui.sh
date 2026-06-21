@@ -5,15 +5,15 @@ source lib/common.sh
 
 # =============================================================================
 # 04-install-webui.sh
-# Installe Open WebUI (sans Docker, via pip/pipx) et le lance en service
-# systemd utilisateur sur http://localhost:8080, en remplacement du terminal
-# pour discuter avec les modeles Ollama.
+# Installs Open WebUI (without Docker, via pip/pipx) and runs it as a
+# user-level systemd service on http://localhost:8080, as a GUI alternative
+# to the terminal for chatting with Ollama models.
 # =============================================================================
 
 load_state
 detect_distro
 
-log_info "Installation d'Open WebUI..."
+log_info "Installing Open WebUI..."
 
 case "$DISTRO_FAMILY" in
   arch)     pkg_install python python-pip pipx ;;
@@ -35,7 +35,7 @@ mkdir -p ~/.config/systemd/user
 
 cat > ~/.config/systemd/user/open-webui.service <<EOF
 [Unit]
-Description=Open WebUI (interface web locale pour Ollama)
+Description=Open WebUI (local web interface for Ollama)
 After=network.target
 
 [Service]
@@ -51,5 +51,5 @@ EOF
 systemctl --user daemon-reload
 systemctl --user enable --now open-webui
 
-log_ok "Open WebUI lance. Accessible sur http://localhost:8080"
-log_info "Pour qu'il demarre aussi sans session ouverte : sudo loginctl enable-linger \$USER"
+log_ok "Open WebUI started. Available at http://localhost:8080"
+log_info "To start it without an active login session: sudo loginctl enable-linger \$USER"

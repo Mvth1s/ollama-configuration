@@ -5,13 +5,12 @@ source lib/common.sh
 
 # =============================================================================
 # 03-pull-models.sh
-# Choisit un palier de modeles (XS/S/M/L) selon la RAM disponible et le
-# type de GPU, puis telecharge 4 modeles, un par usage : texte, code,
-# reflexion (raisonnement), embeddings.
+# Selects a model tier (XS/S/M/L) based on available RAM and GPU type,
+# then downloads 4 models, one per use case: text, code, reasoning, embeddings.
 #
-# Usage : ./03-pull-models.sh [--tier=XS|S|M|L]
-# Modifie les tableaux MODEL_XS / MODEL_S / MODEL_M / MODEL_L ci dessous pour
-# changer les modeles choisis a chaque palier.
+# Usage: ./03-pull-models.sh [--tier=XS|S|M|L]
+# Edit the MODEL_XS / MODEL_S / MODEL_M / MODEL_L arrays below to change
+# which models are selected at each tier.
 # =============================================================================
 
 declare -A MODEL_XS=(
@@ -43,7 +42,7 @@ FORCE_TIER=""
 for arg in "$@"; do
   case "$arg" in
     --tier=*) FORCE_TIER="${arg#*=}" ;;
-    *) log_err "Option inconnue : $arg"; exit 1 ;;
+    *) log_err "Unknown option: $arg"; exit 1 ;;
   esac
 done
 
@@ -53,7 +52,7 @@ detect_ram
 compute_tier() {
   if [ -n "$FORCE_TIER" ]; then
     TIER="$FORCE_TIER"
-    log_info "Palier force manuellement : $TIER"
+    log_info "Tier manually forced: $TIER"
   else
     if   [ "$RAM_GB" -le 8 ];  then TIER="XS"
     elif [ "$RAM_GB" -le 16 ]; then TIER="S"
@@ -61,15 +60,15 @@ compute_tier() {
     else TIER="L"
     fi
 
-    # CPU pur (ni AMD ni Nvidia ni Intel Vulkan actif) : un 12b+ devient trop
-    # lent en pratique, on redescend a S quel que soit le palier RAM brut.
+    # CPU only (no AMD, Nvidia, or active Intel Vulkan): a 12b+ model becomes
+    # too slow in practice, so we drop down to S regardless of raw RAM tier.
     if [ "${GPU_VENDOR:-none}" = "none" ] && { [ "$TIER" = "M" ] || [ "$TIER" = "L" ]; }; then
-      log_warn "Pas de GPU dedie : palier $TIER ramene a S pour rester utilisable en pratique."
+      log_warn "No dedicated GPU: tier $TIER reduced to S to remain usable in practice."
       TIER="S"
     fi
   fi
 
-  log_info "Palier de modeles retenu : $TIER"
+  log_info "Selected model tier: $TIER"
   save_state TIER
 }
 
@@ -79,8 +78,8 @@ declare -n tier_models="MODEL_${TIER}"
 
 for usage in texte code reflexion embeddings; do
   model="${tier_models[$usage]}"
-  log_info "Telechargement du modele $usage : $model"
+  log_info "Downloading $usage model: $model"
   ollama pull "$model"
 done
 
-log_ok "Tous les modeles du palier $TIER sont prets (ollama list pour verifier)."
+log_ok "All models for tier $TIER are ready (run 'ollama list' to verify)."

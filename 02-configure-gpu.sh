@@ -5,35 +5,33 @@ source lib/common.sh
 
 # =============================================================================
 # 02-configure-gpu.sh
-# Detecte TOUS les controleurs graphiques presents (un PC portable a souvent
-# un GPU Intel integre + un GPU Nvidia ou AMD dedie en meme temps), choisit
-# le plus puissant, et configure le backend d'acceleration adapte :
-#   - Nvidia  : CUDA, marche de la meme facon sur toutes les cartes Nvidia
-#               supportees par le driver installe, pas de cas particulier
-#               carte par carte necessaire.
-#   - AMD     : ROCm/HIP par defaut. Pour les puces trop recentes pour etre
-#               deja dans la liste officiellement supportee par ROCm, bascule
-#               automatiquement sur le backend Vulkan avec le contournement
-#               HSA_OVERRIDE_GFX_VERSION connu pour cette generation (detecte
-#               via le code gfx reel de la puce, pas via le nom commercial,
-#               donc ca couvre toute la gamme RDNA4 d'un coup, pas juste 3-4
-#               references).
-#   - Intel   : pas de backend dedie dans Ollama, mais Mesa fournit un driver
-#               Vulkan (ANV) pour tous les iGPU Xe/Iris et les GPU Arc. On
-#               active le backend Vulkan d'Ollama pour en profiter. C'est en
-#               best effort, le support Intel via Vulkan est plus recent et
-#               moins eprouve que CUDA/ROCm : si ca ne s'active pas, Ollama
-#               retombe simplement sur le CPU sans planter.
-#   - Aucun GPU dedie : rien a faire, CPU.
+# Detects ALL graphics controllers present (a laptop often has an integrated
+# Intel GPU + a dedicated Nvidia or AMD GPU at the same time), picks the most
+# powerful one, and configures the appropriate acceleration backend:
+#   - Nvidia  : CUDA, works the same way across all Nvidia cards supported
+#               by the installed driver, no per-card special casing needed.
+#   - AMD     : ROCm/HIP by default. For chips too recent to be in ROCm's
+#               officially supported list, automatically falls back to the
+#               Vulkan backend with the HSA_OVERRIDE_GFX_VERSION workaround
+#               known for that generation (detected via the real gfx code of
+#               the chip, not the commercial name, so it covers the entire
+#               RDNA4 lineup at once rather than just 3-4 specific models).
+#   - Intel   : no dedicated backend in Ollama, but Mesa provides a Vulkan
+#               driver (ANV) for all Xe/Iris iGPUs and Arc GPUs. We enable
+#               Ollama's Vulkan backend to take advantage of it. This is
+#               best effort — Intel via Vulkan is more recent and less
+#               battle-tested than CUDA/ROCm: if it doesn't activate, Ollama
+#               simply falls back to CPU without crashing.
+#   - No dedicated GPU: nothing to do, CPU.
 # =============================================================================
 
 load_state
 detect_distro
 
 # ---------------------------------------------------------------------------
-# Detection de tous les controleurs graphiques, choix du "meilleur"
-# (priorite : Nvidia dedie > AMD dedie > Intel) en cas de config hybride
-# (typique sur portable : iGPU Intel + dGPU Nvidia/AMD).
+# Detect all graphics controllers, pick the "best" one
+# (priority: dedicated Nvidia > dedicated AMD > Intel) for hybrid configs
+# (typical on laptops: Intel iGPU + Nvidia/AMD dGPU).
 # ---------------------------------------------------------------------------
 GPU_VENDOR="none"
 GPU_NAME=""
@@ -43,11 +41,11 @@ detect_all_gpus() {
   lines=$(lspci -nnk 2>/dev/null | grep -Ei 'vga|3d|display' || true)
 
   if [ -z "$lines" ]; then
-    log_warn "Aucun controleur graphique detecte via lspci."
+    log_warn "No graphics controller detected via lspci."
     return
   fi
 
-  log_info "Controleurs graphiques detectes :"
+  log_info "Detected graphics controllers:"
   echo "$lines" | sed -E 's/^/  - /'
 
   if echo "$lines" | grep -qi 'nvidia'; then
@@ -61,28 +59,27 @@ detect_all_gpus() {
     GPU_NAME=$(echo "$lines" | grep -i 'intel' | head -n1 | sed -E 's/.*: //')
   fi
 
-  log_info "GPU retenu pour l'acceleration : ${GPU_NAME:-aucun} ($GPU_VENDOR)"
+  log_info "GPU selected for acceleration: ${GPU_NAME:-none} ($GPU_VENDOR)"
   save_state GPU_VENDOR GPU_NAME
 }
 
 # ---------------------------------------------------------------------------
-# AMD : detection du code gfx reel via rocminfo plutot que via le nom
-# commercial de la carte. Ca couvre n'importe quelle puce AMD, presente ou
-# future, sans avoir a maintenir une liste de noms de cartes a la main.
+# AMD: detect the real gfx code via rocminfo rather than the commercial card
+# name. This covers any AMD chip, present or future, without maintaining a
+# list of card names by hand.
 # ---------------------------------------------------------------------------
 
-# Generations connues pour ne PAS encore etre dans la liste officiellement
-# supportee par ROCm au moment de l'ecriture de ce script (donc necessitant
-# le contournement Vulkan + HSA_OVERRIDE_GFX_VERSION). A completer au fil du
-# temps si ROCm ajoute le support officiel ou si une nouvelle generation sort
-# avant d'etre supportee.
+# Generations known to NOT yet be in the officially supported list by ROCm
+# at the time this script was written (therefore requiring the Vulkan fallback
+# + HSA_OVERRIDE_GFX_VERSION workaround). Update this list over time if ROCm
+# adds official support or if a new generation ships before being supported.
 declare -A AMD_GFX_OVERRIDE=(
   ["gfx1200"]="11.5.0"   # RDNA4 (RX 9060 / 9060 XT)
   ["gfx1201"]="11.5.0"   # RDNA4 (RX 9070 / 9070 XT)
 )
 
 configure_amd() {
-  log_info "Configuration GPU AMD..."
+  log_info "Configuring AMD GPU..."
   case "$DISTRO_FAMILY" in
     arch)     pkg_install vulkan-radeon vulkan-icd-loader vulkan-tools rocminfo ;;
     debian)   pkg_install mesa-vulkan-drivers vulkan-tools rocminfo ;;
@@ -96,21 +93,21 @@ configure_amd() {
   fi
 
   if [ -z "$gfx" ]; then
-    log_warn "Code gfx non detecte (rocminfo absent ou puce non reconnue)."
-    log_warn "Activation du backend Vulkan par defaut, sans contournement specifique."
-    write_amd_override "" 
+    log_warn "GFX code not detected (rocminfo missing or chip not recognized)."
+    log_warn "Enabling Vulkan backend by default, without a specific workaround."
+    write_amd_override ""
     return
   fi
 
-  log_info "Puce AMD identifiee : $gfx"
+  log_info "AMD chip identified: $gfx"
 
   if [ -n "${AMD_GFX_OVERRIDE[$gfx]:-}" ]; then
     local override="${AMD_GFX_OVERRIDE[$gfx]}"
-    log_warn "$gfx pas encore officiellement supporte par ROCm a ce jour."
-    log_warn "Contournement applique : OLLAMA_VULKAN=1 + HSA_OVERRIDE_GFX_VERSION=$override"
+    log_warn "$gfx is not yet officially supported by ROCm."
+    log_warn "Applying workaround: OLLAMA_VULKAN=1 + HSA_OVERRIDE_GFX_VERSION=$override"
     write_amd_override "$override"
   else
-    log_ok "$gfx est deja supporte officiellement par ROCm, config par defaut (HIP)."
+    log_ok "$gfx is officially supported by ROCm, using default config (HIP)."
     clear_ollama_override
   fi
 
@@ -134,41 +131,40 @@ clear_ollama_override() {
 }
 
 # ---------------------------------------------------------------------------
-# Nvidia : CUDA fonctionne de la meme maniere sur toute la gamme supportee
-# par le driver, aucune configuration specifique par modele de carte n'est
-# necessaire ici, contrairement a AMD.
+# Nvidia: CUDA works the same way across the entire supported card range,
+# no per-card configuration is needed here, unlike AMD.
 # ---------------------------------------------------------------------------
 configure_nvidia() {
-  log_info "Configuration GPU Nvidia (CUDA)..."
+  log_info "Configuring Nvidia GPU (CUDA)..."
   clear_ollama_override
 
   if command -v nvidia-smi >/dev/null 2>&1; then
-    log_ok "Driver Nvidia deja present : $(nvidia-smi --query-gpu=name --format=csv,noheader | head -n1)"
+    log_ok "Nvidia driver already present: $(nvidia-smi --query-gpu=name --format=csv,noheader | head -n1)"
     return
   fi
 
-  log_warn "Aucun driver Nvidia detecte, Ollama utilisera le CPU tant qu'il n'est pas installe."
-  read -r -p "Installer le driver Nvidia maintenant ? (necessite un redemarrage apres) [o/N] " reply
-  if [[ "$reply" =~ ^[oOyY]$ ]]; then
+  log_warn "No Nvidia driver detected, Ollama will use the CPU until one is installed."
+  read -r -p "Install the Nvidia driver now? (requires a reboot afterwards) [y/N] " reply
+  if [[ "$reply" =~ ^[yY]$ ]]; then
     case "$DISTRO_FAMILY" in
       arch)     pkg_install nvidia nvidia-utils ;;
       debian)   pkg_install nvidia-driver ;;
       fedora)   pkg_install akmod-nvidia ;;
-      opensuse) log_warn "Sur openSUSE, ajoute le depot NVIDIA officiel puis installe x11-video-nvidiaG06." ;;
+      opensuse) log_warn "On openSUSE, add the official NVIDIA repository then install x11-video-nvidiaG06." ;;
     esac
-    log_warn "Redemarre la machine puis relance ce script pour finaliser la config."
+    log_warn "Reboot the machine then re-run this script to finish the configuration."
     exit 0
   fi
 }
 
 # ---------------------------------------------------------------------------
-# Intel : pas de backend dedie dans Ollama, on passe par Vulkan (driver Mesa
-# ANV), qui couvre aussi bien les iGPU (Xe, Iris Xe, UHD) que les GPU Arc
-# dedies. Best effort : si Ollama ne sait pas l'utiliser, retombe sur le CPU
-# automatiquement, sans erreur bloquante.
+# Intel: no dedicated backend in Ollama, we go through Vulkan (Mesa ANV
+# driver), which covers both iGPUs (Xe, Iris Xe, UHD) and dedicated Arc GPUs.
+# Best effort: if Ollama cannot use it, falls back to CPU automatically,
+# without a blocking error.
 # ---------------------------------------------------------------------------
 configure_intel() {
-  log_info "Configuration GPU Intel (Vulkan, best effort)..."
+  log_info "Configuring Intel GPU (Vulkan, best effort)..."
   case "$DISTRO_FAMILY" in
     arch)     pkg_install vulkan-intel vulkan-icd-loader vulkan-tools ;;
     debian)   pkg_install mesa-vulkan-drivers vulkan-tools ;;
@@ -180,8 +176,8 @@ configure_intel() {
   printf '[Service]\nEnvironment="OLLAMA_VULKAN=1"\n' | sudo tee /etc/systemd/system/ollama.service.d/override.conf >/dev/null
   sudo systemctl daemon-reload
 
-  log_warn "Support Intel via Vulkan plus recent que CUDA/ROCm : verifie les perfs reelles,"
-  log_warn "et desactive (rm /etc/systemd/system/ollama.service.d/override.conf) si pire que le CPU seul."
+  log_warn "Intel via Vulkan is more recent than CUDA/ROCm: verify real-world performance,"
+  log_warn "and disable (rm /etc/systemd/system/ollama.service.d/override.conf) if slower than CPU alone."
 }
 
 # ---------------------------------------------------------------------------
@@ -193,11 +189,11 @@ case "$GPU_VENDOR" in
   amd)    configure_amd ;;
   nvidia) configure_nvidia ;;
   intel)  configure_intel ;;
-  none)   log_info "Pas de GPU dedie, Ollama tournera sur CPU." ; clear_ollama_override ;;
+  none)   log_info "No dedicated GPU, Ollama will run on CPU." ; clear_ollama_override ;;
 esac
 
 if command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet ollama 2>/dev/null; then
   sudo systemctl restart ollama
 fi
 
-log_ok "Configuration GPU terminee."
+log_ok "GPU configuration complete."

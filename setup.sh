@@ -5,18 +5,17 @@ source lib/common.sh
 
 # =============================================================================
 # setup.sh
-# Enchaine les 4 scripts dans l'ordre. Chacun reste utilisable seul, ce qui
-# permet de rejouer juste une etape (ex: reconfigurer le GPU apres un
-# changement de carte, ou retelecharger les modeles avec un autre palier)
-# sans tout refaire.
+# Chains the 4 scripts in order. Each one remains usable standalone, which
+# allows replaying just one step (e.g. reconfigure the GPU after a card swap,
+# or re-download models with a different tier) without redoing everything.
 #
-# Usage :
-#   ./setup.sh                  installation complete, detection auto
-#   ./setup.sh --tier=M          force le palier de modeles
-#   ./setup.sh --skip-models     installe Ollama + GPU + WebUI sans modeles
-#   ./setup.sh --skip-webui      n'installe pas Open WebUI
+# Usage:
+#   ./setup.sh                  full install, auto-detection
+#   ./setup.sh --tier=M         force the model tier
+#   ./setup.sh --skip-models    install Ollama + GPU + WebUI without models
+#   ./setup.sh --skip-webui     skip Open WebUI installation
 #
-# Ou, etape par etape :
+# Or, step by step:
 #   ./01-install-ollama.sh
 #   ./02-configure-gpu.sh
 #   ./03-pull-models.sh --tier=M
@@ -33,7 +32,7 @@ for arg in "$@"; do
     --skip-models) SKIP_MODELS=1 ;;
     --skip-webui) SKIP_WEBUI=1 ;;
     -h|--help) sed -n '2,20p' "$0"; exit 0 ;;
-    *) log_err "Option inconnue : $arg"; exit 1 ;;
+    *) log_err "Unknown option: $arg"; exit 1 ;;
   esac
 done
 
@@ -47,28 +46,28 @@ if [ "$SKIP_MODELS" -eq 0 ]; then
     ./03-pull-models.sh
   fi
 else
-  log_info "Telechargement des modeles ignore (--skip-models)."
+  log_info "Model download skipped (--skip-models)."
 fi
 
 if [ "$SKIP_WEBUI" -eq 0 ]; then
   ./04-install-webui.sh
 else
-  log_info "Installation d'Open WebUI ignoree (--skip-webui)."
+  log_info "Open WebUI installation skipped (--skip-webui)."
 fi
 
 load_state
 echo
 echo "============================================================"
-echo " Resume de l'installation"
+echo " Installation summary"
 echo "============================================================"
-echo " Distro       : ${DISTRO_PRETTY:-inconnue} ($DISTRO_FAMILY)"
-echo " GPU          : ${GPU_NAME:-aucun} (${GPU_VENDOR:-none})"
-echo " RAM          : ${RAM_GB:-?} Go"
-[ "$SKIP_MODELS" -eq 0 ] && echo " Palier       : ${TIER:-?}"
-[ "$SKIP_WEBUI" -eq 0 ] && echo " Interface web: http://localhost:8080"
+echo " Distro       : ${DISTRO_PRETTY:-unknown} ($DISTRO_FAMILY)"
+echo " GPU          : ${GPU_NAME:-none} (${GPU_VENDOR:-none})"
+echo " RAM          : ${RAM_GB:-?} GB"
+[ "$SKIP_MODELS" -eq 0 ] && echo " Tier         : ${TIER:-?}"
+[ "$SKIP_WEBUI" -eq 0 ] && echo " Web UI       : http://localhost:8080"
 echo "============================================================"
-echo " Commandes utiles :"
-echo "   ollama list                            liste les modeles installes"
-echo "   systemctl status ollama                etat du service Ollama"
-echo "   systemctl --user status open-webui     etat de l'interface web"
+echo " Useful commands:"
+echo "   ollama list                            list installed models"
+echo "   systemctl status ollama                Ollama service status"
+echo "   systemctl --user status open-webui     Open WebUI service status"
 echo "============================================================"
