@@ -173,7 +173,7 @@ configure_intel() {
   esac
 
   sudo mkdir -p /etc/systemd/system/ollama.service.d
-  printf '[Service]\nEnvironment="OLLAMA_VULKAN=1"\n' | sudo tee /etc/systemd/system/ollama.service.d/override.conf >/dev/null
+  printf '[Service]\nEnvironment="OLLAMA_VULKAN=1"\nEnvironment="OLLAMA_IGPU_ENABLE=1"\n' | sudo tee /etc/systemd/system/ollama.service.d/override.conf >/dev/null
   sudo systemctl daemon-reload
 
   log_warn "Intel via Vulkan is more recent than CUDA/ROCm: verify real-world performance,"
