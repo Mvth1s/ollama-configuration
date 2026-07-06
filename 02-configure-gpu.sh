@@ -48,15 +48,15 @@ detect_all_gpus() {
   log_info "Detected graphics controllers:"
   echo "$lines" | sed -E 's/^/  - /'
 
-  if echo "$lines" | grep -qi 'nvidia'; then
+  if echo "$lines" | grep -qE '\[10de:'; then
     GPU_VENDOR="nvidia"
-    GPU_NAME=$(echo "$lines" | grep -i 'nvidia' | head -n1 | sed -E 's/.*: //')
-  elif echo "$lines" | grep -qi 'amd\|ati\|radeon'; then
+    GPU_NAME=$(echo "$lines" | grep -E '\[10de:' | head -n1 | sed -E 's/.*: //')
+  elif echo "$lines" | grep -qE '\[(1002|1022):'; then
     GPU_VENDOR="amd"
-    GPU_NAME=$(echo "$lines" | grep -i 'amd\|ati\|radeon' | head -n1 | sed -E 's/.*: //')
-  elif echo "$lines" | grep -qi 'intel'; then
+    GPU_NAME=$(echo "$lines" | grep -E '\[(1002|1022):' | head -n1 | sed -E 's/.*: //')
+  elif echo "$lines" | grep -qE '\[8086:'; then
     GPU_VENDOR="intel"
-    GPU_NAME=$(echo "$lines" | grep -i 'intel' | head -n1 | sed -E 's/.*: //')
+    GPU_NAME=$(echo "$lines" | grep -E '\[8086:' | head -n1 | sed -E 's/.*: //')
   fi
 
   log_info "GPU selected for acceleration: ${GPU_NAME:-none} ($GPU_VENDOR)"
