@@ -1,4 +1,7 @@
-# Rust / Tauri build artifacts (gui/)
+# Rust / Tauri build artifacts (gui/, launcher/)
 /gui/src-tauri/target/
 /gui/src-tauri/gen/schemas/
 /gui/node_modules/
+/launcher/src-tauri/target/
+/launcher/src-tauri/gen/schemas/
+/launcher/node_modules/
