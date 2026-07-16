@@ -95,6 +95,25 @@ fn stream_child(app: &AppHandle, mut child: std::process::Child) -> Result<bool,
     Ok(status.success())
 }
 
+// pkexec normally shows a graphical polkit-agent prompt, but if no agent is
+// registered for the session it silently falls back to reading the
+// password from /dev/tty — bypassing our own Stdio::null() (which only
+// covers stdin, not /dev/tty) and leaking a password prompt into whatever
+// terminal launched the GUI. Detaching the child into its own session
+// before exec removes its controlling terminal entirely, so that fallback
+// can't happen: pkexec then either uses the graphical agent or fails with
+// a clear error we surface in the log, instead of silently prompting.
+#[cfg(unix)]
+fn detach_from_tty(cmd: &mut Command) {
+    use std::os::unix::process::CommandExt;
+    unsafe {
+        cmd.pre_exec(|| {
+            libc::setsid();
+            Ok(())
+        });
+    }
+}
+
 fn run_step(app: &AppHandle, label: &str, mut cmd: Command) -> Result<bool, String> {
     emit_log(app, "meta", format!("--- {label} ---"));
     let child = cmd
@@ -119,6 +138,7 @@ fn run_linux(app: &AppHandle, repo_root: &Path, opts: &InstallOptions) -> Result
     for (label, script, extra_args) in privileged {
         let mut cmd = Command::new("pkexec");
         cmd.current_dir(repo_root).arg(repo_root.join(script)).args(&extra_args);
+        detach_from_tty(&mut cmd);
         let ok = run_step(app, label, cmd)?;
         if !ok {
             return Err(format!("{label} failed, see the log above."));
