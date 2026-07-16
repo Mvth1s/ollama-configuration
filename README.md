@@ -115,6 +115,8 @@ A thin [Tauri](https://tauri.app) GUI wrapping `setup.sh`/`setup.ps1` (same opti
 
 For day-to-day use afterwards, [`launcher/`](launcher/README.md) is a separate, smaller Tauri app: opens Open WebUI in its own window, and lists/pulls/deletes Ollama models directly via Ollama's local API.
 
+Packaged installers (`.deb`/`.rpm`/`.AppImage`/`.msi`/`.exe`) for both are attached to [GitHub Releases](https://github.com/Mvth1s/ollama-configuration/releases) — built and published automatically by CI on every release.
+
 ## License
 
 [MIT](LICENSE)

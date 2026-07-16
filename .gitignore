@@ -5,3 +5,6 @@
 /launcher/src-tauri/target/
 /launcher/src-tauri/gen/schemas/
 /launcher/node_modules/
+
+# Release tooling (root package.json: commitlint/husky/semantic-release)
+/node_modules/
