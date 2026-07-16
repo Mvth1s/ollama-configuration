@@ -10,7 +10,9 @@ use serde::{Deserialize, Serialize};
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
+
+const WEBUI_URL: &str = "http://127.0.0.1:8080";
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -215,9 +217,31 @@ fn run_install(app: AppHandle, options: InstallOptions) -> Result<InstallDone, S
     }
 }
 
+// Reuses the same Tauri app/window infrastructure rather than a separate
+// webview tech (e.g. pywebview): just a second window pointed directly at
+// Open WebUI, with no browser chrome (Tauri windows never have an address
+// bar), identical on Linux and Windows since it only uses Tauri's own
+// cross-platform window APIs.
+#[tauri::command]
+fn open_webui_window(app: AppHandle) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("webui") {
+        return window.set_focus().map_err(|e| e.to_string());
+    }
+
+    let url = WEBUI_URL.parse().map_err(|e: url::ParseError| e.to_string())?;
+    WebviewWindowBuilder::new(&app, "webui", WebviewUrl::External(url))
+        .title("Open WebUI")
+        .inner_size(1100.0, 800.0)
+        .min_inner_size(480.0, 360.0)
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
 fn main() {
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![run_install])
+        .invoke_handler(tauri::generate_handler![run_install, open_webui_window])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
