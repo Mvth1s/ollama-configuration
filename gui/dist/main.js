@@ -7,6 +7,7 @@ const tierSelect = document.getElementById('tier');
 const skipModels = document.getElementById('skip-models');
 const skipWebui = document.getElementById('skip-webui');
 const installBtn = document.getElementById('install-btn');
+const webuiBtn = document.getElementById('webui-btn');
 const logEl = document.getElementById('log');
 const statusEl = document.getElementById('status');
 
@@ -50,6 +51,17 @@ installBtn.addEventListener('click', async () => {
   } catch (err) {
     // install-done already reflects the failure in the UI; this only
     // guards against an unhandled promise rejection in the console.
+    console.error(err);
+  }
+});
+
+// Always enabled: Open WebUI may already be running from a previous
+// install. If it isn't reachable yet, the window just shows a connection
+// error, same as opening the URL in any browser.
+webuiBtn.addEventListener('click', async () => {
+  try {
+    await invoke('open_webui_window');
+  } catch (err) {
     console.error(err);
   }
 });

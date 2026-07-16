@@ -111,7 +111,7 @@ Get-ScheduledTask OpenWebUI    # Open WebUI task status
 
 ## Desktop GUI
 
-A thin [Tauri](https://tauri.app) GUI wrapping `setup.sh`/`setup.ps1` (same options, streams the scripts' output live) is available in [`gui/`](gui/README.md).
+A thin [Tauri](https://tauri.app) GUI wrapping `setup.sh`/`setup.ps1` (same options, streams the scripts' output live, plus a button to open Open WebUI in its own window) is available in [`gui/`](gui/README.md).
 
 ## License
 

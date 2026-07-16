@@ -105,6 +105,12 @@ button {
   cursor: pointer;
 }
 
+button.secondary {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+
 button:disabled {
   opacity: 0.6;
   cursor: default;
