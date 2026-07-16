@@ -81,6 +81,34 @@ To start Open WebUI without an active user session:
 sudo loginctl enable-linger $USER
 ```
 
+## Windows installation
+
+A separate, native PowerShell implementation (`setup.ps1` + `lib\common.ps1`), not a port of the Bash scripts and not meant to run under WSL:
+
+```powershell
+git clone https://github.com/Mvth1s/ollama-configuration.git
+cd ollama-configuration
+.\setup.ps1
+```
+
+Options:
+
+```powershell
+.\setup.ps1                     # full install, auto-detection
+.\setup.ps1 -Tier M             # force a specific model tier (XS / S / M / L)
+.\setup.ps1 -SkipModels         # install Ollama + Open WebUI without models
+.\setup.ps1 -SkipWebui          # skip Open WebUI installation
+```
+
+Same RAM-based tier auto-selection and model tables as the table above. GPU handling is intentionally minimal: the official Ollama Windows installer already detects CUDA and ROCm natively, so the script only detects the GPU vendor (same PCI vendor IDs as the Linux scripts) to log it, and warns if an AMD GPU may fall outside ROCm's officially supported list on Windows.
+
+Open WebUI is installed via `pip`/`pipx` and run through a per-user scheduled task (`OpenWebUI`, triggered at logon) instead of a systemd service, at the same `http://localhost:8080`.
+
+```powershell
+ollama list                    # list installed models
+Get-ScheduledTask OpenWebUI    # Open WebUI task status
+```
+
 ## License
 
 [MIT](LICENSE)

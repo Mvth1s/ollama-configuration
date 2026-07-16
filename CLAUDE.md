@@ -4,13 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this project does
 
-A set of Bash scripts that install and configure a local Ollama stack (LLM inference + Open WebUI) on Linux. The four numbered scripts can be run individually or chained via `setup.sh`.
+A set of Bash scripts that install and configure a local Ollama stack (LLM inference + Open WebUI) on Linux, plus a separate native PowerShell implementation (`setup.ps1` + `lib/common.ps1`) for Windows. The four numbered Bash scripts can be run individually or chained via `setup.sh`; `setup.ps1` is the single Windows entry point (see [Windows script](#windows-script-setupps1--libcommonps1) below). The two implementations are independent: the Windows script does not wrap or require WSL, and is not a literal port — it is adapted to Windows/PowerShell primitives (CIM, winget, scheduled tasks) with the same overall shape (logging, shared state, RAM/GPU detection, model tiers) kept in sync by hand.
 
 ## Requirements
 
-- Linux (Arch, Debian/Ubuntu, Fedora, openSUSE — other distros require manual GPU driver installation)
-- bash ≥ 4.0 (associative arrays used throughout)
-- `curl`, `sudo` privileges for package installation and systemd configuration
+- Linux (Arch, Debian/Ubuntu, Fedora, openSUSE — other distros require manual GPU driver installation): bash ≥ 4.0 (associative arrays used throughout), `curl`, `sudo` privileges for package installation and systemd configuration
+- Windows: PowerShell 5.1+, `winget` recommended (used to install Ollama/Python unattended; falls back to downloading the official installer otherwise)
 
 ## Running the scripts
 
@@ -35,7 +34,19 @@ A set of Bash scripts that install and configure a local Ollama stack (LLM infer
 ./setup.sh --no-tui
 ```
 
-There are no tests, build steps, or linters — these are operational shell scripts.
+```powershell
+# Windows: full install, auto-detection
+.\setup.ps1
+
+# Force a specific model tier
+.\setup.ps1 -Tier M
+
+# Skip model download or web UI
+.\setup.ps1 -SkipModels
+.\setup.ps1 -SkipWebui
+```
+
+There are no tests, build steps, or linters — these are operational shell/PowerShell scripts.
 
 ## Architecture
 
@@ -88,11 +99,28 @@ The tier selection uses `declare -n` (bash nameref) to dynamically reference the
 
 Similarly, `02-configure-gpu.sh`'s Nvidia driver install confirmation uses `tui_yesno` when a backend is available, falling back to the original `read -r -p` prompt otherwise.
 
+## Windows script (`setup.ps1` + `lib/common.ps1`)
+
+A single-file orchestrator (`setup.ps1`) plus a shared library (`lib/common.ps1`), dot-sourced the same way `lib/common.sh` is on Linux — not split into four numbered scripts, since the roadmap that introduced it only called for these two files. `lib/common.ps1` provides:
+- **Logging helpers**: `Log-Info`, `Log-Ok`, `Log-Warn`, `Log-Err` (`Write-Host` with `-ForegroundColor`, not raw ANSI codes, for PowerShell 5.1 console compatibility)
+- **Shared state**: `Load-State` / `Save-State -VarNames …` persist globals (`RamGb`, `GpuVendor`, `GpuName`, `Tier`) to `%APPDATA%\ollama-stack\state.env`, using the same `VAR="value"` line format as Linux's `state.env` so both files stay easy to read side by side
+- **`Get-RamGb`**: RAM rounded up to the next GB via `Get-CimInstance Win32_ComputerSystem`
+- **`Get-GpuVendor`**: reads `PNPDeviceID` from `Get-CimInstance Win32_VideoController`, matching the *same* PCI vendor IDs as `02-configure-gpu.sh` (`10DE`=Nvidia, `1002`/`1022`=AMD, `8086`=Intel), priority Nvidia > AMD > Intel
+
+`setup.ps1` itself:
+- Defines `$ModelTiers` with the same tags as `MODEL_XS/S/M/L` in `03-pull-models.sh` — **kept in sync by hand**, update both when changing a model
+- `Install-OllamaWindows`: installs via `winget` if available, else downloads and runs the official `OllamaSetup.exe` interactively; either way, verifies `ollama` is actually on `PATH` afterwards and errors out asking for a new terminal if not (a fresh PowerShell session is needed to pick up a PATH change made by the installer)
+- `Set-GpuConfig`: **intentionally minimal**, unlike `02-configure-gpu.sh` — the official Windows installer already handles CUDA/ROCm natively, so this only logs the detected vendor and warns for AMD that the chip may be outside ROCm's officially supported list on Windows (no Vulkan-override equivalent is attempted)
+- `Get-ModelTier` / `Install-Models`: same RAM thresholds and CPU-only downgrade-to-S rule as `03-pull-models.sh`'s `compute_tier`; no TUI/interactive model picker on Windows
+- `Install-OpenWebUI`: installs via `pipx` (fallback `pip`), then registers a **per-user Scheduled Task** (`OpenWebUI`, `AtLogOn` trigger) instead of a systemd unit — Windows has no systemd — serving on the same port 8080; `OLLAMA_BASE_URL`/`WEBUI_AUTH` are persisted with `[Environment]::SetEnvironmentVariable(..., 'User')` since scheduled tasks inherit the user's persisted environment rather than accepting an `Environment=` block like systemd
+
+Does not reuse or wrap the Bash scripts, including under WSL — it is a separate, native Windows implementation, so GPU/RAM/tier logic must be updated in both places when it changes.
+
 ## Conventions
 
-- Every script starts with `set -euo pipefail` and `cd "$(dirname "$0")"`.
+- Every script starts with `set -euo pipefail` and `cd "$(dirname "$0")"` (Bash) or `$ErrorActionPreference = 'Stop'` (PowerShell).
 - Scripts are idempotent: they check whether something is already installed/running before acting.
-- All user-visible strings are in French.
-- Open WebUI runs as a user-level service (`systemctl --user`), not system-level. To enable autostart without an active login session: `sudo loginctl enable-linger $USER`.
+- All user-visible strings are in English (see `f174bb7`, which translated the originally-French comments/log messages).
+- Open WebUI runs as a user-level service, not system-level: `systemctl --user` on Linux, a per-user Scheduled Task on Windows. Linux autostart without an active login session needs `sudo loginctl enable-linger $USER`.
 - The `AMD_GFX_OVERRIDE` map in `02-configure-gpu.sh` must be updated when ROCm adds official support for a GFX generation (remove the entry) or when a new unsupported generation ships (add the entry).
-- `dialog`/`whiptail` are optional, never auto-installed: `02-configure-gpu.sh` and `03-pull-models.sh` use them when present and the terminal is interactive, and silently fall back to plain `read`/default-model behavior otherwise (or always, with `--no-tui`).
+- `dialog`/`whiptail` are optional, never auto-installed: `02-configure-gpu.sh` and `03-pull-models.sh` use them when present and the terminal is interactive, and silently fall back to plain `read`/default-model behavior otherwise (or always, with `--no-tui`). Windows has no TUI equivalent.
