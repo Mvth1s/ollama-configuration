@@ -136,6 +136,16 @@ A second, separate Tauri app (own `Cargo.toml`/`tauri.conf.json`/binary, not a m
 - `open_webui_window` duplicates `gui/`'s command of the same name (opens/focuses a window on `http://127.0.0.1:8080` via `WebviewUrl::External`) — small enough that sharing it via a crate wasn't worth the indirection for two call sites.
 - Same gitignore/Cargo.lock conventions as `gui/`, mirrored under `launcher/src-tauri/`.
 
+## Releases
+
+The root `package.json` is release tooling only (commitlint, husky, semantic-release) — it is not a JS project and has nothing to do with `gui/`/`launcher/`'s frontends, which still have zero npm dependency of their own.
+
+- **Commit messages must follow [Conventional Commits](https://www.conventionalcommits.org/)** (`feat:`, `fix:`, `docs:`, `chore:`, ...), enforced locally by a husky `commit-msg` hook running `commitlint` (`commitlint.config.js`, extends `@commitlint/config-conventional`). Run `npm install` once at the repo root to activate the hook (`prepare` script sets it up).
+- **`.github/workflows/release.yml`** runs `semantic-release` on every push to `main` (i.e. whenever `dev` is promoted to `main`). It inspects commits since the last release to decide the version bump (`fix:` → patch, `feat:` → minor, `BREAKING CHANGE:` footer → major), updates `CHANGELOG.md`, and creates both a `vX.Y.Z` git tag and a GitHub Release (`.releaserc.json`). It does **not** publish anything to npm (`package.json` has `"private": true`, and the plugin list in `.releaserc.json` omits `@semantic-release/npm`).
+- **`.github/workflows/build-desktop.yml`** triggers on that `vX.Y.Z` tag push (also available via manual `workflow_dispatch` for testing the build step alone) and builds `gui/` and `launcher/` for Linux (`.deb`/`.rpm`/`.AppImage`, on `ubuntu-22.04` for broad glibc compatibility) and Windows (`.msi`/`.exe`) via [`tauri-apps/tauri-action`](https://github.com/tauri-apps/tauri-action), attaching the bundles to the release semantic-release just created.
+- The `version` field inside `gui/src-tauri/tauri.conf.json` / `launcher/src-tauri/tauri.conf.json` is **not** automatically synced to the release tag — a deliberate simplification for now, since the two apps aren't independently versioned yet.
+- `gui/src-tauri/icons/` and `launcher/src-tauri/icons/` each hold a full icon set (`32x32.png`, `128x128.png`, `128x128@2x.png`, `icon.ico`, `icon.png`) generated with ImageMagick (`convert ... -define icon:auto-resize=... icon.ico`), required by the Windows bundler (`.ico`) and recommended for the Linux ones; both `bundle.active` are `true` with `bundle.targets: "all"` so the bundler picks whatever formats are valid for the OS it runs on.
+
 ## Conventions
 
 - Every script starts with `set -euo pipefail` and `cd "$(dirname "$0")"` (Bash) or `$ErrorActionPreference = 'Stop'` (PowerShell).
@@ -143,4 +153,5 @@ A second, separate Tauri app (own `Cargo.toml`/`tauri.conf.json`/binary, not a m
 - All user-visible strings are in English (see `f174bb7`, which translated the originally-French comments/log messages).
 - Open WebUI runs as a user-level service, not system-level: `systemctl --user` on Linux, a per-user Scheduled Task on Windows. Linux autostart without an active login session needs `sudo loginctl enable-linger $USER`.
 - The `AMD_GFX_OVERRIDE` map in `02-configure-gpu.sh` must be updated when ROCm adds official support for a GFX generation (remove the entry) or when a new unsupported generation ships (add the entry).
+- Commit messages must follow Conventional Commits (see [Releases](#releases) above) — enforced by a husky/commitlint hook once `npm install` has been run at the repo root.
 - `dialog`/`whiptail` are optional, never auto-installed: `02-configure-gpu.sh` and `03-pull-models.sh` use them when present and the terminal is interactive, and silently fall back to plain `read`/default-model behavior otherwise (or always, with `--no-tui`). Windows has no TUI equivalent.
