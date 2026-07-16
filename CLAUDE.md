@@ -30,6 +30,9 @@ A set of Bash scripts that install and configure a local Ollama stack (LLM infer
 ./02-configure-gpu.sh
 ./03-pull-models.sh --tier=S
 ./04-install-webui.sh
+
+# Disable the interactive dialog/whiptail menus
+./setup.sh --no-tui
 ```
 
 There are no tests, build steps, or linters — these are operational shell scripts.
@@ -41,6 +44,7 @@ All scripts source `lib/common.sh` at startup, which provides:
 - **Distro detection**: `detect_distro` sets `DISTRO_FAMILY` (arch / debian / fedora / opensuse / unknown) by reading `/etc/os-release` fields `ID` and `ID_LIKE`
 - **Package installation**: `pkg_install <pkg>…` dispatches to the right package manager for the detected distro
 - **Shared state**: `load_state` / `save_state VAR…` persist variables (GPU vendor, RAM, tier, distro) to `~/.config/ollama-stack/state.env` so later scripts can skip re-detection when chained together, but still work correctly when run standalone
+- **TUI helpers**: `tui_available` detects a usable backend (`dialog`, else `whiptail`, else none), `tui_yesno` / `tui_menu` wrap the two; `detect_tui` treats `--no-tui` (sets `NO_TUI=1`) and a non-interactive stdin/stdout as "no backend" so scripted/chained calls never block on a prompt
 
 To force full re-detection on the next run, delete `~/.config/ollama-stack/state.env`.
 
@@ -49,7 +53,7 @@ To force full re-detection on the next run, delete `~/.config/ollama-stack/state
 | Script | Role |
 |--------|------|
 | `01-install-ollama.sh` | Installs Ollama via the official curl script; enables and waits up to 30 s for the systemd service |
-| `02-configure-gpu.sh` | Detects GPU vendor (priority: Nvidia > AMD > Intel for hybrid configs), installs drivers/Vulkan packages, writes a systemd drop-in (`/etc/systemd/system/ollama.service.d/override.conf`) for AMD Vulkan workarounds or Intel Vulkan; Nvidia uses CUDA with no override needed |
+| `02-configure-gpu.sh` | Detects GPU vendor via `lspci` PCI IDs (`10de`=Nvidia, `1002`/`1022`=AMD, `8086`=Intel — not commercial card names, which are unreliable), priority Nvidia > AMD > Intel for hybrid configs; installs drivers/Vulkan packages, writes a systemd drop-in (`/etc/systemd/system/ollama.service.d/override.conf`) for AMD Vulkan workarounds or Intel Vulkan; Nvidia uses CUDA with no override needed |
 | `03-pull-models.sh` | Selects a model tier (XS/S/M/L) based on RAM and GPU presence, then pulls four models: texte, code, reflexion, embeddings |
 | `04-install-webui.sh` | Installs Open WebUI via `pipx` (fallback: `pip`), creates a **user-level** systemd service (`~/.config/systemd/user/open-webui.service`) on port 8080 |
 
@@ -60,6 +64,10 @@ To force full re-detection on the next run, delete `~/.config/ollama-stack/state
 ### Nvidia GPU handling
 
 If `nvidia-smi` is not found, `02-configure-gpu.sh` **interactively prompts** the user before installing drivers, then exits asking for a reboot. Re-run after reboot to complete configuration.
+
+### Intel GPU handling
+
+There is no dedicated Ollama backend for Intel, so `02-configure-gpu.sh` enables the Vulkan backend (Mesa ANV driver) via the systemd drop-in, setting both `OLLAMA_VULKAN=1` and `OLLAMA_IGPU_ENABLE=1` (the latter is required for Ollama to actually consider integrated GPUs rather than only discrete ones). This is best effort — covers Xe/Iris iGPUs and Arc GPUs, and falls back to CPU silently if it doesn't activate.
 
 ### Model tiers
 
@@ -74,6 +82,12 @@ Tiers are defined as associative arrays `MODEL_XS/S/M/L` in `03-pull-models.sh`.
 
 The tier selection uses `declare -n` (bash nameref) to dynamically reference the right `MODEL_<TIER>` array.
 
+### Interactive model selection (TUI)
+
+`03-pull-models.sh` also defines `CAND_<TIER>_<usage>` arrays (e.g. `CAND_S_texte`), each holding 2-3 `"model|description"` candidates per tier/usage. When no `--tier=` was forced, `tui_available` is true, and the terminal is interactive, `select_models_tui` shows one `tui_menu` per usage and overwrites the tier's default with the user's pick via the `tier_models` nameref; a cancelled/failed menu keeps the tier default. This selection step is skipped entirely (default model kept) when `--tier=` is forced, `--no-tui` is passed, or no `dialog`/`whiptail` backend is available, so `setup.sh` and any scripted call remain fully unattended.
+
+Similarly, `02-configure-gpu.sh`'s Nvidia driver install confirmation uses `tui_yesno` when a backend is available, falling back to the original `read -r -p` prompt otherwise.
+
 ## Conventions
 
 - Every script starts with `set -euo pipefail` and `cd "$(dirname "$0")"`.
@@ -81,3 +95,4 @@ The tier selection uses `declare -n` (bash nameref) to dynamically reference the
 - All user-visible strings are in French.
 - Open WebUI runs as a user-level service (`systemctl --user`), not system-level. To enable autostart without an active login session: `sudo loginctl enable-linger $USER`.
 - The `AMD_GFX_OVERRIDE` map in `02-configure-gpu.sh` must be updated when ROCm adds official support for a GFX generation (remove the entry) or when a new unsupported generation ships (add the entry).
+- `dialog`/`whiptail` are optional, never auto-installed: `02-configure-gpu.sh` and `03-pull-models.sh` use them when present and the terminal is interactive, and silently fall back to plain `read`/default-model behavior otherwise (or always, with `--no-tui`).

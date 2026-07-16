@@ -25,17 +25,24 @@ The web interface is then available at **http://localhost:8080**.
 ./setup.sh --tier=M          # force a specific model tier (XS / S / M / L)
 ./setup.sh --skip-models     # install Ollama + GPU + WebUI without models
 ./setup.sh --skip-webui      # skip Open WebUI installation
+./setup.sh --no-tui          # disable the interactive dialog/whiptail menus
 ```
+
+## Interactive mode (TUI)
+
+When run in an interactive terminal with `dialog` or `whiptail` installed, and no explicit `--tier=`, `02-configure-gpu.sh` and `03-pull-models.sh` show interactive menus instead of the plain text prompts: a yes/no dialog to confirm the Nvidia driver install, and a per-usage menu (text/code/reasoning/embeddings) to pick among 2-3 candidate models instead of the tier's single default.
+
+Neither `dialog` nor `whiptail` is a hard requirement. If neither is installed, or the script is not run in an interactive terminal (chained through `setup.sh` unattended, or in a script/CI), the scripts fall back to the existing plain prompts and default models automatically. Pass `--no-tui` to force that fallback even in an interactive terminal.
 
 ## Individual steps
 
 Each script can be re-run on its own without reinstalling everything:
 
 ```bash
-./01-install-ollama.sh                   # install Ollama and start the service
-./02-configure-gpu.sh                    # detect GPU and configure acceleration
-./03-pull-models.sh [--tier=XS|S|M|L]   # download models
-./04-install-webui.sh                    # install Open WebUI
+./01-install-ollama.sh                          # install Ollama and start the service
+./02-configure-gpu.sh [--no-tui]                # detect GPU and configure acceleration
+./03-pull-models.sh [--tier=XS|S|M|L] [--no-tui] # download models
+./04-install-webui.sh                           # install Open WebUI
 ```
 
 ## Model tiers
