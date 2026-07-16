@@ -111,7 +111,9 @@ Get-ScheduledTask OpenWebUI    # Open WebUI task status
 
 ## Desktop GUI
 
-A thin [Tauri](https://tauri.app) GUI wrapping `setup.sh`/`setup.ps1` (same options, streams the scripts' output live, plus a button to open Open WebUI in its own window) is available in [`gui/`](gui/README.md).
+A thin [Tauri](https://tauri.app) GUI wrapping `setup.sh`/`setup.ps1` (same options, streams the scripts' output live, plus a button to open Open WebUI in its own window) is available in [`gui/`](gui/README.md), for the one-off install.
+
+For day-to-day use afterwards, [`launcher/`](launcher/README.md) is a separate, smaller Tauri app: opens Open WebUI in its own window, and lists/pulls/deletes Ollama models directly via Ollama's local API.
 
 ## License
 
