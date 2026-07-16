@@ -4,12 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this project does
 
-A set of Bash scripts that install and configure a local Ollama stack (LLM inference + Open WebUI) on Linux, plus a separate native PowerShell implementation (`setup.ps1` + `lib/common.ps1`) for Windows. The four numbered Bash scripts can be run individually or chained via `setup.sh`; `setup.ps1` is the single Windows entry point (see [Windows script](#windows-script-setupps1--libcommonps1) below). The two implementations are independent: the Windows script does not wrap or require WSL, and is not a literal port — it is adapted to Windows/PowerShell primitives (CIM, winget, scheduled tasks) with the same overall shape (logging, shared state, RAM/GPU detection, model tiers) kept in sync by hand.
+A set of Bash scripts that install and configure a local Ollama stack (LLM inference + Open WebUI) on Linux, plus a separate native PowerShell implementation (`setup.ps1` + `lib/common.ps1`) for Windows, plus an optional Tauri desktop GUI (`gui/`) that wraps both. The four numbered Bash scripts can be run individually or chained via `setup.sh`; `setup.ps1` is the single Windows entry point (see [Windows script](#windows-script-setupps1--libcommonps1) below). The two script implementations are independent: the Windows script does not wrap or require WSL, and is not a literal port — it is adapted to Windows/PowerShell primitives (CIM, winget, scheduled tasks) with the same overall shape (logging, shared state, RAM/GPU detection, model tiers) kept in sync by hand. The GUI (see [Desktop GUI](#desktop-gui-gui) below) is purely an orchestration layer over `setup.sh`/`setup.ps1`: it never reimplements detection or tier logic itself.
 
 ## Requirements
 
 - Linux (Arch, Debian/Ubuntu, Fedora, openSUSE — other distros require manual GPU driver installation): bash ≥ 4.0 (associative arrays used throughout), `curl`, `sudo` privileges for package installation and systemd configuration
 - Windows: PowerShell 5.1+, `winget` recommended (used to install Ollama/Python unattended; falls back to downloading the official installer otherwise)
+- Desktop GUI (`gui/`, optional): Rust/`cargo`; on Linux, WebKitGTK dev packages (`libwebkit2gtk-4.1-dev`, `libgtk-3-dev`, `libsoup-3.0-dev` on Debian/Ubuntu). No Node.js/npm needed — the frontend is plain HTML/JS with no build step.
 
 ## Running the scripts
 
@@ -115,6 +116,15 @@ A single-file orchestrator (`setup.ps1`) plus a shared library (`lib/common.ps1`
 - `Install-OpenWebUI`: installs via `pipx` (fallback `pip`), then registers a **per-user Scheduled Task** (`OpenWebUI`, `AtLogOn` trigger) instead of a systemd unit — Windows has no systemd — serving on the same port 8080; `OLLAMA_BASE_URL`/`WEBUI_AUTH` are persisted with `[Environment]::SetEnvironmentVariable(..., 'User')` since scheduled tasks inherit the user's persisted environment rather than accepting an `Environment=` block like systemd
 
 Does not reuse or wrap the Bash scripts, including under WSL — it is a separate, native Windows implementation, so GPU/RAM/tier logic must be updated in both places when it changes.
+
+## Desktop GUI (`gui/`)
+
+A [Tauri](https://tauri.app) app (Rust backend in `gui/src-tauri/`, vanilla HTML/CSS/JS frontend in `gui/dist/`, no npm dependency — `tauri.conf.json` sets `app.withGlobalTauri = true` so the frontend uses the injected `window.__TAURI__` global instead of importing `@tauri-apps/api`). See `gui/README.md` for build/run instructions and full detail. Key points:
+- `find_repo_root()` in `src-tauri/src/main.rs` walks up from the running executable looking for `setup.sh`/`setup.ps1`, so it works both under `cargo run` (nested a few levels under `gui/src-tauri/target/`) and as a standalone binary dropped at the repo root.
+- The single `run_install` Tauri command spawns the platform script and streams stdout/stderr line-by-line back to the frontend as `install-log` events (plus a final `install-done`), via two reader threads per child process to avoid pipe-buffer deadlocks.
+- **Linux**: only `01-install-ollama.sh`/`02-configure-gpu.sh` (system-level: packages, systemd units) run through `pkexec`; `03-pull-models.sh`/`04-install-webui.sh` (per-user state: `pipx`, `~/.config/systemd/user/`) run unprivileged. Wrapping the whole `setup.sh` in `pkexec` would run everything as root and misplace that per-user state — this is why the GUI invokes the four scripts separately instead of calling `setup.sh`.
+- **Windows**: `setup.ps1` is invoked as a whole via `Start-Process -Verb RunAs`, since UAC elevation keeps the same user account (unlike `pkexec` switching to root), so there is no equivalent per-user-state problem there.
+- `gui/src-tauri/target/` and `gui/src-tauri/gen/schemas/` are gitignored (build artifacts); `gui/src-tauri/icons/icon.png` is a placeholder and `gui/src-tauri/Cargo.lock` is committed intentionally (binary application, not a library).
 
 ## Conventions
 
