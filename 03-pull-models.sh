@@ -49,25 +49,25 @@ declare -A MODEL_L=(
 # Interactive candidates per tier/usage, format "model|short description".
 # The first entry always matches the corresponding MODEL_<TIER> default above.
 # ---------------------------------------------------------------------------
-CAND_XS_texte=("llama3.2:3b|Rapide, bon généraliste pour petite config" "qwen2.5:3b|Alternative multilingue" "phi3.5:3.8b|Compact, bon raisonnement de base")
-CAND_XS_code=("qwen2.5-coder:3b|Généraliste code léger" "starcoder2:3b|Alternative orientée complétion")
-CAND_XS_reflexion=("deepseek-r1:1.5b|Raisonnement pas à pas, très léger" "qwen2.5:1.5b|Alternative généraliste légère")
-CAND_XS_embeddings=("nomic-embed-text|Embeddings généralistes, standard" "all-minilm|Plus léger, plus rapide")
+CAND_XS_texte=("llama3.2:3b|Fast, solid generalist for low-end hardware" "qwen2.5:3b|Multilingual alternative" "phi3.5:3.8b|Compact, decent basic reasoning")
+CAND_XS_code=("qwen2.5-coder:3b|Lightweight general-purpose coding model" "starcoder2:3b|Alternative geared toward completion")
+CAND_XS_reflexion=("deepseek-r1:1.5b|Step-by-step reasoning, very lightweight" "qwen2.5:1.5b|Lightweight generalist alternative")
+CAND_XS_embeddings=("nomic-embed-text|Standard general-purpose embeddings" "all-minilm|Lighter, faster")
 
-CAND_S_texte=("llama3.1:8b|Généraliste équilibré" "gemma2:9b|Alternative Google, bon suivi d'instructions" "mistral:7b|Rapide, bon compromis")
-CAND_S_code=("qwen2.5-coder:7b|Généraliste code" "codellama:7b|Alternative Meta, orientée complétion")
-CAND_S_reflexion=("deepseek-r1:7b|Raisonnement pas à pas" "qwen2.5:7b|Alternative généraliste")
-CAND_S_embeddings=("nomic-embed-text|Embeddings généralistes, standard" "all-minilm|Plus léger, plus rapide")
+CAND_S_texte=("llama3.1:8b|Well-balanced generalist" "gemma2:9b|Google alternative, good instruction following" "mistral:7b|Fast, good tradeoff")
+CAND_S_code=("qwen2.5-coder:7b|General-purpose coding model" "codellama:7b|Meta alternative, geared toward completion")
+CAND_S_reflexion=("deepseek-r1:7b|Step-by-step reasoning" "qwen2.5:7b|Generalist alternative")
+CAND_S_embeddings=("nomic-embed-text|Standard general-purpose embeddings" "all-minilm|Lighter, faster")
 
-CAND_M_texte=("gemma3:12b|Généraliste Google récent" "mistral-nemo:12b|Alternative Mistral/Nvidia" "qwen2.5:14b|Plus grand, meilleur raisonnement général")
-CAND_M_code=("devstral:24b|Orienté agents de code" "qwen2.5-coder:14b|Alternative plus légère")
-CAND_M_reflexion=("deepseek-r1:14b|Raisonnement pas à pas" "qwen2.5:14b|Alternative généraliste")
-CAND_M_embeddings=("nomic-embed-text|Embeddings généralistes, standard" "mxbai-embed-large|Plus précis, plus lourd")
+CAND_M_texte=("gemma3:12b|Recent Google generalist" "mistral-nemo:12b|Mistral/Nvidia alternative" "qwen2.5:14b|Bigger, better general reasoning")
+CAND_M_code=("devstral:24b|Geared toward coding agents" "qwen2.5-coder:14b|Lighter alternative")
+CAND_M_reflexion=("deepseek-r1:14b|Step-by-step reasoning" "qwen2.5:14b|Generalist alternative")
+CAND_M_embeddings=("nomic-embed-text|Standard general-purpose embeddings" "mxbai-embed-large|More accurate, heavier")
 
-CAND_L_texte=("gemma3:27b|Généraliste Google, gros modèle" "qwen2.5:32b|Alternative Alibaba" "mixtral:8x7b|Mixture-of-experts, bon compromis vitesse/qualité")
-CAND_L_code=("qwen2.5-coder:32b|Généraliste code, gros modèle" "devstral:24b|Alternative orientée agents de code")
-CAND_L_reflexion=("deepseek-r1:32b|Raisonnement pas à pas, gros modèle" "qwq:32b|Alternative Alibaba orientée raisonnement")
-CAND_L_embeddings=("nomic-embed-text|Embeddings généralistes, standard" "mxbai-embed-large|Plus précis, plus lourd")
+CAND_L_texte=("gemma3:27b|Large Google generalist" "qwen2.5:32b|Alibaba alternative" "mixtral:8x7b|Mixture-of-experts, good speed/quality tradeoff")
+CAND_L_code=("qwen2.5-coder:32b|Large general-purpose coding model" "devstral:24b|Alternative geared toward coding agents")
+CAND_L_reflexion=("deepseek-r1:32b|Large step-by-step reasoning model" "qwq:32b|Alibaba alternative geared toward reasoning")
+CAND_L_embeddings=("nomic-embed-text|Standard general-purpose embeddings" "mxbai-embed-large|More accurate, heavier")
 
 FORCE_TIER=""
 for arg in "$@"; do
@@ -125,11 +125,11 @@ select_models_tui() {
       menu_args+=("$model" "$desc")
     done
 
-    chosen=$(tui_menu "Modèle $usage (tier $TIER)" "Choisissez le modèle $usage :" "${menu_args[@]}") || chosen=""
+    chosen=$(tui_menu "$usage model (tier $TIER)" "Choose the $usage model:" "${menu_args[@]}") || chosen=""
     if [ -n "$chosen" ]; then
       tier_models[$usage]="$chosen"
     else
-      log_warn "Sélection annulée pour $usage, valeur par défaut conservée (${tier_models[$usage]})."
+      log_warn "Selection cancelled for $usage, default kept (${tier_models[$usage]})."
     fi
   done
 }
