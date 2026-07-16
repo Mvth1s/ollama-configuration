@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Ollama Launcher</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<main>
+  <h1>Ollama Launcher</h1>
+
+  <button type="button" id="webui-btn" class="primary full">Open Web UI</button>
+
+  <section>
+    <h2>Models</h2>
+    <div id="models-empty" class="empty">Loading...</div>
+    <table id="models-table" class="models hidden">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Size</th>
+          <th>Params</th>
+          <th>Quant</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="models-body"></tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Pull a model</h2>
+    <div class="pull-row">
+      <input type="text" id="pull-input" placeholder="e.g. llama3.2:3b" />
+      <button type="button" id="pull-btn">Pull</button>
+    </div>
+    <div id="pull-status" class="pull-status"></div>
+  </section>
+
+  <p id="error" class="error hidden"></p>
+</main>
+<script src="main.js"></script>
+</body>
+</html>

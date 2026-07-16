@@ -4,13 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this project does
 
-A set of Bash scripts that install and configure a local Ollama stack (LLM inference + Open WebUI) on Linux, plus a separate native PowerShell implementation (`setup.ps1` + `lib/common.ps1`) for Windows, plus an optional Tauri desktop GUI (`gui/`) that wraps both. The four numbered Bash scripts can be run individually or chained via `setup.sh`; `setup.ps1` is the single Windows entry point (see [Windows script](#windows-script-setupps1--libcommonps1) below). The two script implementations are independent: the Windows script does not wrap or require WSL, and is not a literal port — it is adapted to Windows/PowerShell primitives (CIM, winget, scheduled tasks) with the same overall shape (logging, shared state, RAM/GPU detection, model tiers) kept in sync by hand. The GUI (see [Desktop GUI](#desktop-gui-gui) below) is purely an orchestration layer over `setup.sh`/`setup.ps1`: it never reimplements detection or tier logic itself.
+A set of Bash scripts that install and configure a local Ollama stack (LLM inference + Open WebUI) on Linux, plus a separate native PowerShell implementation (`setup.ps1` + `lib/common.ps1`) for Windows, plus two optional Tauri apps: `gui/` (one-off install) and `launcher/` (day-to-day: open Open WebUI, manage models). The four numbered Bash scripts can be run individually or chained via `setup.sh`; `setup.ps1` is the single Windows entry point (see [Windows script](#windows-script-setupps1--libcommonps1) below). The two script implementations are independent: the Windows script does not wrap or require WSL, and is not a literal port — it is adapted to Windows/PowerShell primitives (CIM, winget, scheduled tasks) with the same overall shape (logging, shared state, RAM/GPU detection, model tiers) kept in sync by hand. `gui/` (see [Desktop GUI](#desktop-gui-gui) below) is purely an orchestration layer over `setup.sh`/`setup.ps1`: it never reimplements detection or tier logic itself. `launcher/` (see [Ollama Launcher](#ollama-launcher-launcher) below) is a separate app that never touches the install scripts at all, talking directly to Ollama's and Open WebUI's own local APIs instead.
 
 ## Requirements
 
 - Linux (Arch, Debian/Ubuntu, Fedora, openSUSE — other distros require manual GPU driver installation): bash ≥ 4.0 (associative arrays used throughout), `curl`, `sudo` privileges for package installation and systemd configuration
 - Windows: PowerShell 5.1+, `winget` recommended (used to install Ollama/Python unattended; falls back to downloading the official installer otherwise)
-- Desktop GUI (`gui/`, optional): Rust/`cargo`; on Linux, WebKitGTK dev packages (`libwebkit2gtk-4.1-dev`, `libgtk-3-dev`, `libsoup-3.0-dev` on Debian/Ubuntu). No Node.js/npm needed — the frontend is plain HTML/JS with no build step.
+- Desktop GUI (`gui/`, `launcher/`, both optional): Rust/`cargo`; on Linux, WebKitGTK dev packages (`libwebkit2gtk-4.1-dev`, `libgtk-3-dev`, `libsoup-3.0-dev` on Debian/Ubuntu). No Node.js/npm needed — both frontends are plain HTML/JS with no build step.
 
 ## Running the scripts
 
@@ -125,6 +125,15 @@ A [Tauri](https://tauri.app) app (Rust backend in `gui/src-tauri/`, vanilla HTML
 - **Linux**: only `01-install-ollama.sh`/`02-configure-gpu.sh` (system-level: packages, systemd units) run through `pkexec`; `03-pull-models.sh`/`04-install-webui.sh` (per-user state: `pipx`, `~/.config/systemd/user/`) run unprivileged. Wrapping the whole `setup.sh` in `pkexec` would run everything as root and misplace that per-user state — this is why the GUI invokes the four scripts separately instead of calling `setup.sh`.
 - **Windows**: `setup.ps1` is invoked as a whole via `Start-Process -Verb RunAs`, since UAC elevation keeps the same user account (unlike `pkexec` switching to root), so there is no equivalent per-user-state problem there.
 - `gui/src-tauri/target/` and `gui/src-tauri/gen/schemas/` are gitignored (build artifacts); `gui/src-tauri/icons/icon.png` is a placeholder and `gui/src-tauri/Cargo.lock` is committed intentionally (binary application, not a library).
+
+## Ollama Launcher (`launcher/`)
+
+A second, separate Tauri app (own `Cargo.toml`/`tauri.conf.json`/binary, not a mode of `gui/`) for day-to-day use after the install is done. Unlike `gui/`, it never touches `setup.sh`/`setup.ps1`; it talks directly to local HTTP APIs:
+- `list_models` / `pull_model` / `delete_model` in `launcher/src-tauri/src/main.rs` call Ollama's own REST API (`GET /api/tags`, `POST /api/pull`, `DELETE /api/delete` on `127.0.0.1:11434`) via `reqwest::blocking` — TLS is disabled at the Cargo feature level (`default-features = false`) since only plain local HTTP is ever used.
+- `pull_model` streams Ollama's NDJSON progress response line-by-line into `pull-progress` events, the same idiom `gui/` uses for child-process stdout.
+- Deleting a model requires confirming a JS `confirm()` dialog first, since it's irreversible.
+- `open_webui_window` duplicates `gui/`'s command of the same name (opens/focuses a window on `http://127.0.0.1:8080` via `WebviewUrl::External`) — small enough that sharing it via a crate wasn't worth the indirection for two call sites.
+- Same gitignore/Cargo.lock conventions as `gui/`, mirrored under `launcher/src-tauri/`.
 
 ## Conventions
 
