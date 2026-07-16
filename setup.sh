@@ -14,6 +14,7 @@ source lib/common.sh
 #   ./setup.sh --tier=M         force the model tier
 #   ./setup.sh --skip-models    install Ollama + GPU + WebUI without models
 #   ./setup.sh --skip-webui     skip Open WebUI installation
+#   ./setup.sh --no-tui         disable the interactive dialog/whiptail menus
 #
 # Or, step by step:
 #   ./01-install-ollama.sh
@@ -25,25 +26,32 @@ source lib/common.sh
 FORCE_TIER=""
 SKIP_MODELS=0
 SKIP_WEBUI=0
+NO_TUI_FLAG=0
 
 for arg in "$@"; do
   case "$arg" in
     --tier=*) FORCE_TIER="${arg#*=}" ;;
     --skip-models) SKIP_MODELS=1 ;;
     --skip-webui) SKIP_WEBUI=1 ;;
-    -h|--help) sed -n '2,20p' "$0"; exit 0 ;;
+    --no-tui) NO_TUI_FLAG=1 ;;
+    -h|--help) sed -n '2,21p' "$0"; exit 0 ;;
     *) log_err "Unknown option: $arg"; exit 1 ;;
   esac
 done
 
+TUI_ARG=()
+if [ "$NO_TUI_FLAG" -eq 1 ]; then
+  TUI_ARG=(--no-tui)
+fi
+
 ./01-install-ollama.sh
-./02-configure-gpu.sh
+./02-configure-gpu.sh "${TUI_ARG[@]}"
 
 if [ "$SKIP_MODELS" -eq 0 ]; then
   if [ -n "$FORCE_TIER" ]; then
-    ./03-pull-models.sh --tier="$FORCE_TIER"
+    ./03-pull-models.sh --tier="$FORCE_TIER" "${TUI_ARG[@]}"
   else
-    ./03-pull-models.sh
+    ./03-pull-models.sh "${TUI_ARG[@]}"
   fi
 else
   log_info "Model download skipped (--skip-models)."

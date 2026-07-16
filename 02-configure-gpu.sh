@@ -23,7 +23,16 @@ source lib/common.sh
 #               battle-tested than CUDA/ROCm: if it doesn't activate, Ollama
 #               simply falls back to CPU without crashing.
 #   - No dedicated GPU: nothing to do, CPU.
+#
+# Usage: ./02-configure-gpu.sh [--no-tui]
 # =============================================================================
+
+for arg in "$@"; do
+  case "$arg" in
+    --no-tui) NO_TUI=1 ;;
+    *) log_err "Unknown option: $arg"; exit 1 ;;
+  esac
+done
 
 load_state
 detect_distro
@@ -144,8 +153,21 @@ configure_nvidia() {
   fi
 
   log_warn "No Nvidia driver detected, Ollama will use the CPU until one is installed."
-  read -r -p "Install the Nvidia driver now? (requires a reboot afterwards) [y/N] " reply
-  if [[ "$reply" =~ ^[yY]$ ]]; then
+
+  local install_confirmed=0
+  if tui_available; then
+    if tui_yesno "Nvidia driver" "Install the Nvidia driver now?\n(requires a reboot afterwards)"; then
+      install_confirmed=1
+    fi
+  else
+    local reply
+    read -r -p "Install the Nvidia driver now? (requires a reboot afterwards) [y/N] " reply
+    if [[ "$reply" =~ ^[yY]$ ]]; then
+      install_confirmed=1
+    fi
+  fi
+
+  if [ "$install_confirmed" -eq 1 ]; then
     case "$DISTRO_FAMILY" in
       arch)     pkg_install nvidia nvidia-utils ;;
       debian)   pkg_install nvidia-driver ;;
