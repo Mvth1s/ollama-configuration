@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Ollama Stack</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<main>
+  <h1>Ollama Stack</h1>
+  <p class="subtitle">Installs Ollama, configures GPU acceleration, and deploys Open WebUI.</p>
+
+  <form id="install-form">
+    <div class="field">
+      <label for="tier">Model tier</label>
+      <select id="tier">
+        <option value="auto">Auto (based on RAM)</option>
+        <option value="XS">XS</option>
+        <option value="S">S</option>
+        <option value="M">M</option>
+        <option value="L">L</option>
+      </select>
+    </div>
+
+    <div class="field field-checkbox">
+      <label><input type="checkbox" id="skip-models" /> Skip model download</label>
+    </div>
+    <div class="field field-checkbox">
+      <label><input type="checkbox" id="skip-webui" /> Skip Open WebUI</label>
+    </div>
+
+    <div class="actions">
+      <button type="button" id="install-btn">Install</button>
+      <span id="status" class="status"></span>
+    </div>
+  </form>
+
+  <pre id="log" class="log" aria-live="polite"></pre>
+</main>
+<script src="main.js"></script>
+</body>
+</html>

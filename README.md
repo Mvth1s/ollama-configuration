@@ -109,6 +109,10 @@ ollama list                    # list installed models
 Get-ScheduledTask OpenWebUI    # Open WebUI task status
 ```
 
+## Desktop GUI
+
+A thin [Tauri](https://tauri.app) GUI wrapping `setup.sh`/`setup.ps1` (same options, streams the scripts' output live) is available in [`gui/`](gui/README.md).
+
 ## License
 
 [MIT](LICENSE)
