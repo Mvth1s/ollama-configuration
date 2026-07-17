@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+# All MODEL_<TIER> / CAND_<TIER>_<usage> arrays below are only ever read
+# through dynamic `declare -n` namerefs built from tier/usage strings at
+# runtime (compute_tier, select_models_tui), which ShellCheck's static
+# analysis cannot follow — hence this file-wide disable rather than ~20
+# repeats of the same false positive.
+# shellcheck disable=SC2034
 set -euo pipefail
 cd "$(dirname "$0")"
 source lib/common.sh
@@ -127,6 +133,11 @@ select_models_tui() {
 
     chosen=$(tui_menu "$usage model (tier $TIER)" "Choose the $usage model:" "${menu_args[@]}") || chosen=""
     if [ -n "$chosen" ]; then
+      # tier_models is a nameref to an associative array (string keys), not
+      # an indexed one: dropping $ here would silently write to a literal
+      # "usage" key instead of the intended tier/usage, so keep it despite
+      # ShellCheck's arithmetic-subscript suggestion (verified in bash).
+      # shellcheck disable=SC2004
       tier_models[$usage]="$chosen"
     else
       log_warn "Selection cancelled for $usage, default kept (${tier_models[$usage]})."
