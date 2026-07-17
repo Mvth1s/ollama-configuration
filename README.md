@@ -109,6 +109,38 @@ ollama list                    # list installed models
 Get-ScheduledTask OpenWebUI    # Open WebUI task status
 ```
 
+## Security note
+
+Open WebUI is installed with **no login** (`WEBUI_AUTH=False`) — anyone who can reach it can chat and manage models without authenticating. To limit the blast radius of that, it also listens on **`127.0.0.1` only by default**: nothing outside the machine itself can reach it, regardless of `WEBUI_AUTH`.
+
+If you want to reach it from another device on your network (e.g. a phone), enable LAN access at any time, on or off, without reinstalling anything:
+
+```bash
+./toggle-webui-lan.sh on       # reachable from your local network
+./toggle-webui-lan.sh off      # back to this machine only (default)
+./toggle-webui-lan.sh status   # show the current setting
+```
+
+```powershell
+.\toggle-webui-lan.ps1 on
+.\toggle-webui-lan.ps1 off
+.\toggle-webui-lan.ps1 status
+```
+
+Turning LAN access **on** prints a warning every time, because `WEBUI_AUTH` stays `False`: once reachable from the network, anyone on it can use Open WebUI, including pulling/deleting models, without logging in. If that's not acceptable for your network, enable login instead of (or in addition to) LAN access:
+
+- Linux: edit `Environment="WEBUI_AUTH=False"` to `"True"` in `~/.config/systemd/user/open-webui.service`, then `systemctl --user daemon-reload && systemctl --user restart open-webui`.
+- Windows: `[Environment]::SetEnvironmentVariable('WEBUI_AUTH', 'True', 'User')`, then restart the `OpenWebUI` scheduled task.
+- Create an account on your next visit to `http://localhost:8080` — the first account created becomes the admin.
+
+## Linting
+
+Bash scripts are checked with [ShellCheck](https://www.shellcheck.net/) on every push and pull request ([`.github/workflows/lint.yml`](.github/workflows/lint.yml)). Run the same check locally from the repo root:
+
+```bash
+shellcheck -x *.sh lib/*.sh
+```
+
 ## Desktop GUI
 
 A thin [Tauri](https://tauri.app) GUI wrapping `setup.sh`/`setup.ps1` (same options, streams the scripts' output live, plus a button to open Open WebUI in its own window) is available in [`gui/`](gui/README.md), for the one-off install.

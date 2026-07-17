@@ -33,6 +33,9 @@ A set of Bash scripts that install and configure a local Ollama stack (LLM infer
 
 # Disable the interactive dialog/whiptail menus
 ./setup.sh --no-tui
+
+# Allow/restrict Open WebUI access from other devices on the network, any time
+./toggle-webui-lan.sh on|off|status
 ```
 
 ```powershell
@@ -45,9 +48,12 @@ A set of Bash scripts that install and configure a local Ollama stack (LLM infer
 # Skip model download or web UI
 .\setup.ps1 -SkipModels
 .\setup.ps1 -SkipWebui
+
+# Allow/restrict Open WebUI access from other devices on the network, any time
+.\toggle-webui-lan.ps1 on|off|status
 ```
 
-There are no tests, build steps, or linters — these are operational shell/PowerShell scripts.
+There are no tests or build steps — these are operational shell/PowerShell scripts. Bash scripts are linted with [ShellCheck](https://www.shellcheck.net/) (`.github/workflows/lint.yml`, on every push/PR; run locally with `shellcheck -x *.sh lib/*.sh`). PowerShell has no equivalent linter wired up.
 
 ## Architecture
 
@@ -67,7 +73,8 @@ To force full re-detection on the next run, delete `~/.config/ollama-stack/state
 | `01-install-ollama.sh` | Installs Ollama via the official curl script; enables and waits up to 30 s for the systemd service |
 | `02-configure-gpu.sh` | Detects GPU vendor via `lspci` PCI IDs (`10de`=Nvidia, `1002`/`1022`=AMD, `8086`=Intel — not commercial card names, which are unreliable), priority Nvidia > AMD > Intel for hybrid configs; installs drivers/Vulkan packages, writes a systemd drop-in (`/etc/systemd/system/ollama.service.d/override.conf`) for AMD Vulkan workarounds or Intel Vulkan; Nvidia uses CUDA with no override needed |
 | `03-pull-models.sh` | Selects a model tier (XS/S/M/L) based on RAM and GPU presence, then pulls four models: texte, code, reflexion, embeddings |
-| `04-install-webui.sh` | Installs Open WebUI via `pipx` (fallback: `pip`), creates a **user-level** systemd service (`~/.config/systemd/user/open-webui.service`) on port 8080 |
+| `04-install-webui.sh` | Installs Open WebUI via `pipx` (fallback: `pip`), creates a **user-level** systemd service (`~/.config/systemd/user/open-webui.service`) on port 8080, bound to `127.0.0.1` only by default |
+| `toggle-webui-lan.sh` | Not part of the chain, run standalone at any time: flips Open WebUI between `127.0.0.1`-only and LAN-reachable (`0.0.0.0`) and restarts the service — see [Open WebUI LAN access toggle](#open-webui-lan-access-toggle) |
 
 ### AMD GPU handling
 
@@ -80,6 +87,10 @@ If `nvidia-smi` is not found, `02-configure-gpu.sh` **interactively prompts** th
 ### Intel GPU handling
 
 There is no dedicated Ollama backend for Intel, so `02-configure-gpu.sh` enables the Vulkan backend (Mesa ANV driver) via the systemd drop-in, setting both `OLLAMA_VULKAN=1` and `OLLAMA_IGPU_ENABLE=1` (the latter is required for Ollama to actually consider integrated GPUs rather than only discrete ones). This is best effort — covers Xe/Iris iGPUs and Arc GPUs, and falls back to CPU silently if it doesn't activate.
+
+### Open WebUI LAN access toggle
+
+Open WebUI's `serve` command has no environment variable for its bind address, only a `--host` CLI flag (upstream default `0.0.0.0`) — confirmed by reading `open_webui`'s own `serve()` definition, since this is easy to get wrong silently. `04-install-webui.sh` therefore writes the desired host to its own small file, `~/.config/ollama-stack/webui.env` (`WEBUI_HOST=127.0.0.1` by default, only created if missing so re-running the installer never resets a later choice), and references it from the unit via `EnvironmentFile=`. The `ExecStart=` line reads `--host \${WEBUI_HOST}` with the `$` escaped in the heredoc so it reaches the unit file literally — systemd itself substitutes `${WEBUI_HOST}` from `EnvironmentFile=` into `ExecStart=` at service-start time (verified empirically with a throwaway unit; this is a systemd feature, unrelated to Open WebUI). `toggle-webui-lan.sh on|off|status` only rewrites `webui.env` and reloads/restarts the service — it never regenerates the unit file, so it works instantly without re-running the installer. `WEBUI_AUTH` is intentionally *not* touched by the toggle: enabling LAN access never silently enables auth, and both scripts print a warning explaining that when LAN access is turned on.
 
 ### Model tiers
 
@@ -113,7 +124,8 @@ A single-file orchestrator (`setup.ps1`) plus a shared library (`lib/common.ps1`
 - `Install-OllamaWindows`: installs via `winget` if available, else downloads and runs the official `OllamaSetup.exe` interactively; either way, verifies `ollama` is actually on `PATH` afterwards and errors out asking for a new terminal if not (a fresh PowerShell session is needed to pick up a PATH change made by the installer)
 - `Set-GpuConfig`: **intentionally minimal**, unlike `02-configure-gpu.sh` — the official Windows installer already handles CUDA/ROCm natively, so this only logs the detected vendor and warns for AMD that the chip may be outside ROCm's officially supported list on Windows (no Vulkan-override equivalent is attempted)
 - `Get-ModelTier` / `Install-Models`: same RAM thresholds and CPU-only downgrade-to-S rule as `03-pull-models.sh`'s `compute_tier`; no TUI/interactive model picker on Windows
-- `Install-OpenWebUI`: installs via `pipx` (fallback `pip`), then registers a **per-user Scheduled Task** (`OpenWebUI`, `AtLogOn` trigger) instead of a systemd unit — Windows has no systemd — serving on the same port 8080; `OLLAMA_BASE_URL`/`WEBUI_AUTH` are persisted with `[Environment]::SetEnvironmentVariable(..., 'User')` since scheduled tasks inherit the user's persisted environment rather than accepting an `Environment=` block like systemd
+- `Install-OpenWebUI`: installs via `pipx` (fallback `pip`), then registers a **per-user Scheduled Task** (`OpenWebUI`, `AtLogOn` trigger) instead of a systemd unit — Windows has no systemd — serving on the same port 8080; `OLLAMA_BASE_URL`/`WEBUI_AUTH` are persisted with `[Environment]::SetEnvironmentVariable(..., 'User')` since scheduled tasks inherit the user's persisted environment rather than accepting an `Environment=` block like systemd. Unlike `WEBUI_AUTH`, the bind address has no env-var equivalent on the Open WebUI side (only a `--host` CLI flag, same constraint as Linux — see [Open WebUI LAN access toggle](#open-webui-lan-access-toggle)), so `$Global:WebuiHost` (persisted like `Tier`/`GpuVendor` via `Save-State`, `127.0.0.1` by default) is baked directly into the scheduled task's `-Argument` string at registration time.
+- `toggle-webui-lan.ps1`: the Windows counterpart to `toggle-webui-lan.sh`. Since there's no systemd-style `EnvironmentFile=` substitution to lean on, it rebuilds the scheduled task's action with `Set-ScheduledTask -Action` (reusing the already-registered `Execute` path) and restarts the task — no reinstall needed. Also never touches `WEBUI_AUTH`, same reasoning as the Linux script.
 
 Does not reuse or wrap the Bash scripts, including under WSL — it is a separate, native Windows implementation, so GPU/RAM/tier logic must be updated in both places when it changes.
 
@@ -152,6 +164,8 @@ The root `package.json` is release tooling only (commitlint, husky, semantic-rel
 - Scripts are idempotent: they check whether something is already installed/running before acting.
 - All user-visible strings are in English (see `f174bb7`, which translated the originally-French comments/log messages).
 - Open WebUI runs as a user-level service, not system-level: `systemctl --user` on Linux, a per-user Scheduled Task on Windows. Linux autostart without an active login session needs `sudo loginctl enable-linger $USER`.
+- Open WebUI is deployed with `WEBUI_AUTH=False` (no login) and, since the LAN-access toggle, listens on `127.0.0.1` only by default — see [Open WebUI LAN access toggle](#open-webui-lan-access-toggle) and [README.md's Security note](README.md#security-note). `WEBUI_AUTH` and the bind address are deliberately independent switches; don't couple them (e.g. don't make enabling LAN access also flip `WEBUI_AUTH`) without asking first, since that's a product decision, not a bug fix.
 - The `AMD_GFX_OVERRIDE` map in `02-configure-gpu.sh` must be updated when ROCm adds official support for a GFX generation (remove the entry) or when a new unsupported generation ships (add the entry).
 - Commit messages must follow Conventional Commits (see [Releases](#releases) above) — enforced by a husky/commitlint hook once `npm install` has been run at the repo root.
+- The two `# shellcheck disable=` directives in `03-pull-models.sh` (file-wide `SC2034` for the nameref-only-read `MODEL_*`/`CAND_*` arrays, and a line-level `SC2004` on `tier_models[$usage]=`) are deliberate, verified false positives, not lint debt — see the comments right above each for why. Don't "fix" the `SC2004` one by dropping the `$`: `tier_models` is a nameref to an associative array, and doing so silently writes to a literal `usage` key instead of the intended tier/usage (verified in bash: `arr[key]=` and `arr[$key]=` are different keys for associative arrays, unlike indexed ones).
 - `dialog`/`whiptail` are optional, never auto-installed: `02-configure-gpu.sh` and `03-pull-models.sh` use them when present and the terminal is interactive, and silently fall back to plain `read`/default-model behavior otherwise (or always, with `--no-tui`). Windows has no TUI equivalent.
