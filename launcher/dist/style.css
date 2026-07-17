@@ -82,6 +82,30 @@ button:disabled {
   font-size: 0.85rem;
 }
 
+.lan-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+}
+
+.lan-row input {
+  accent-color: var(--accent);
+}
+
+.lan-warning {
+  margin: 8px 0 0;
+  font-size: 0.8rem;
+  color: var(--err);
+}
+
+.lan-status {
+  margin-top: 6px;
+  font-size: 0.8rem;
+  color: var(--muted);
+  min-height: 1em;
+}
+
 .hidden {
   display: none;
 }

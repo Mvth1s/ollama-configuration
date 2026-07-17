@@ -4,6 +4,9 @@ const { invoke } = window.__TAURI__.core;
 const { listen } = window.__TAURI__.event;
 
 const webuiBtn = document.getElementById('webui-btn');
+const lanToggle = document.getElementById('lan-toggle');
+const lanWarning = document.getElementById('lan-warning');
+const lanStatus = document.getElementById('lan-status');
 const modelsEmpty = document.getElementById('models-empty');
 const modelsTable = document.getElementById('models-table');
 const modelsBody = document.getElementById('models-body');
@@ -113,6 +116,37 @@ webuiBtn.addEventListener('click', async () => {
   }
 });
 
+async function refreshLanStatus() {
+  try {
+    const enabled = await invoke('webui_lan_status');
+    lanToggle.checked = enabled;
+    lanWarning.classList.toggle('hidden', !enabled);
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+lanToggle.addEventListener('change', async () => {
+  const enabled = lanToggle.checked;
+  lanToggle.disabled = true;
+  lanStatus.textContent = 'Applying...';
+  try {
+    const message = await invoke('set_webui_lan', { enabled });
+    lanWarning.classList.toggle('hidden', !enabled);
+    lanStatus.textContent = message;
+    clearError();
+  } catch (err) {
+    // Revert the checkbox: the backend call failed, so the setting wasn't
+    // actually applied.
+    lanToggle.checked = !enabled;
+    lanWarning.classList.toggle('hidden', !lanToggle.checked);
+    lanStatus.textContent = '';
+    showError(String(err));
+  } finally {
+    lanToggle.disabled = false;
+  }
+});
+
 listen('pull-progress', (event) => {
   const { status, completed, total } = event.payload;
   if (total && completed) {
@@ -149,3 +183,4 @@ pullBtn.addEventListener('click', async () => {
 });
 
 refreshModels();
+refreshLanStatus();

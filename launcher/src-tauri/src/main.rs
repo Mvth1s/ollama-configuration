@@ -6,6 +6,9 @@
 
 use serde::{Deserialize, Serialize};
 use std::io::{BufRead, BufReader};
+#[cfg(not(target_os = "windows"))]
+use std::path::PathBuf;
+use std::process::Command;
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 
 const OLLAMA_URL: &str = "http://127.0.0.1:11434";
@@ -143,6 +146,129 @@ fn delete_model(model: String) -> Result<(), String> {
     Ok(())
 }
 
+// Open WebUI's own `serve` command has no environment variable for its bind
+// address, only a --host CLI flag, so toggling LAN access means touching
+// whatever actually drives that flag: the small $HOME/.config/ollama-stack/
+// webui.env file 04-install-webui.sh's systemd unit reads via
+// EnvironmentFile= on Linux, and the 'OpenWebUI' scheduled task's own
+// -Argument string on Windows (rebuilt via powershell.exe, mirroring
+// toggle-webui-lan.ps1 — there is no equivalent to EnvironmentFile=
+// substitution in Task Scheduler). Same read/write pair the standalone
+// toggle-webui-lan.sh/.ps1 scripts use, reimplemented here rather than
+// shelled out to, since the launcher is meant to keep working as a
+// standalone packaged binary without the repo scripts nearby.
+
+#[cfg(not(target_os = "windows"))]
+fn webui_env_path() -> PathBuf {
+    PathBuf::from(std::env::var("HOME").unwrap_or_default()).join(".config/ollama-stack/webui.env")
+}
+
+#[cfg(not(target_os = "windows"))]
+#[tauri::command]
+fn webui_lan_status() -> bool {
+    std::fs::read_to_string(webui_env_path())
+        .ok()
+        .and_then(|content| content.lines().find_map(|line| line.strip_prefix("WEBUI_HOST=").map(str::trim)).map(str::to_string))
+        .map(|host| host == "0.0.0.0")
+        .unwrap_or(false)
+}
+
+#[cfg(not(target_os = "windows"))]
+#[tauri::command]
+fn set_webui_lan(enabled: bool) -> Result<String, String> {
+    let host = if enabled { "0.0.0.0" } else { "127.0.0.1" };
+    let path = webui_env_path();
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| format!("Failed to create {}: {e}", parent.display()))?;
+    }
+    std::fs::write(&path, format!("WEBUI_HOST={host}\n")).map_err(|e| format!("Failed to write {}: {e}", path.display()))?;
+
+    let unit_installed = PathBuf::from(std::env::var("HOME").unwrap_or_default())
+        .join(".config/systemd/user/open-webui.service")
+        .exists();
+    if !unit_installed {
+        return Ok("Saved. Open WebUI is not installed yet; this will apply automatically once you install it.".into());
+    }
+
+    Command::new("systemctl")
+        .args(["--user", "daemon-reload"])
+        .status()
+        .map_err(|e| format!("Failed to run systemctl --user daemon-reload: {e}"))?;
+
+    let status = Command::new("systemctl")
+        .args(["--user", "restart", "open-webui"])
+        .status()
+        .map_err(|e| format!("Failed to run systemctl --user restart open-webui: {e}"))?;
+
+    if status.success() {
+        Ok("Open WebUI restarted with the new setting.".into())
+    } else {
+        Err("systemctl --user restart open-webui failed. Check `systemctl --user status open-webui`.".into())
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn run_powershell(script: &str) -> Result<String, String> {
+    let output = Command::new("powershell.exe")
+        .args(["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script])
+        .output()
+        .map_err(|e| format!("Failed to run powershell.exe: {e}"))?;
+
+    if !output.status.success() {
+        return Err(format!("PowerShell command failed: {}", String::from_utf8_lossy(&output.stderr)));
+    }
+    Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+}
+
+#[cfg(target_os = "windows")]
+#[tauri::command]
+fn webui_lan_status() -> bool {
+    let script = r#"
+$task = Get-ScheduledTask -TaskName 'OpenWebUI' -ErrorAction SilentlyContinue
+if ($task) {
+    $argStr = ($task.Actions | Select-Object -First 1).Arguments
+    if ($argStr -match '--host\s+(\S+)') { Write-Output $Matches[1] } else { Write-Output '127.0.0.1' }
+} else {
+    Write-Output '127.0.0.1'
+}
+"#;
+    run_powershell(script).map(|out| out == "0.0.0.0").unwrap_or(false)
+}
+
+#[cfg(target_os = "windows")]
+#[tauri::command]
+fn set_webui_lan(enabled: bool) -> Result<String, String> {
+    let host = if enabled { "0.0.0.0" } else { "127.0.0.1" };
+    let script = format!(
+        r#"
+$StateDir = Join-Path $env:APPDATA 'ollama-stack'
+$StateFile = Join-Path $StateDir 'state.env'
+New-Item -ItemType Directory -Path $StateDir -Force | Out-Null
+$existing = @()
+if (Test-Path $StateFile) {{ $existing = @(Get-Content $StateFile | Where-Object {{ $_ -notmatch '^WebuiHost=' }}) }}
+Set-Content -Path $StateFile -Value ($existing + ('WebuiHost="{host}"'))
+
+$task = Get-ScheduledTask -TaskName 'OpenWebUI' -ErrorAction SilentlyContinue
+if (-not $task) {{
+    Write-Output 'NOT_INSTALLED'
+    exit 0
+}}
+$webuiBin = ($task.Actions | Select-Object -First 1).Execute
+$action = New-ScheduledTaskAction -Execute $webuiBin -Argument 'serve --port 8080 --host {host}'
+Set-ScheduledTask -TaskName 'OpenWebUI' -Action $action | Out-Null
+Stop-ScheduledTask -TaskName 'OpenWebUI' -ErrorAction SilentlyContinue
+Start-ScheduledTask -TaskName 'OpenWebUI'
+Write-Output 'OK'
+"#
+    );
+    let out = run_powershell(&script)?;
+    if out.contains("NOT_INSTALLED") {
+        Ok("Saved. Open WebUI is not installed yet; this will apply automatically once you install it.".into())
+    } else {
+        Ok("Open WebUI restarted with the new setting.".into())
+    }
+}
+
 // Same mechanism as gui/'s open_webui_window: a second Tauri window pointed
 // directly at Open WebUI, no separate webview technology.
 #[tauri::command]
@@ -164,7 +290,14 @@ fn open_webui_window(app: AppHandle) -> Result<(), String> {
 
 fn main() {
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![list_models, pull_model, delete_model, open_webui_window])
+        .invoke_handler(tauri::generate_handler![
+            list_models,
+            pull_model,
+            delete_model,
+            open_webui_window,
+            webui_lan_status,
+            set_webui_lan
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
