@@ -12,7 +12,10 @@
     tier selection and the model tables are identical to 03-pull-models.sh, by
     hand-kept parity, so Linux and Windows never drift on model choice. Open
     WebUI runs via a per-user scheduled task (AtLogOn) instead of a systemd
-    user service, since systemd does not exist on Windows.
+    user service, since systemd does not exist on Windows. It listens on
+    127.0.0.1 only by default; run .\toggle-webui-lan.ps1 on|off|status at
+    any time afterwards to allow/restrict access from other devices on the
+    network.
 
     This script does not reuse or wrap the Bash scripts, including under WSL:
     it is a separate, native Windows implementation.
@@ -178,16 +181,34 @@ function Install-OpenWebUI {
     [Environment]::SetEnvironmentVariable('OLLAMA_BASE_URL', 'http://127.0.0.1:11434', 'User')
     [Environment]::SetEnvironmentVariable('WEBUI_AUTH', 'False', 'User')
 
-    $action = New-ScheduledTaskAction -Execute $webuiBin -Argument 'serve --port 8080'
+    # WebuiHost is persisted state (like Tier/GpuVendor), not just an install
+    # default: re-running this script must not silently undo a LAN-access
+    # choice made afterwards with toggle-webui-lan.ps1.
+    if (-not $Global:WebuiHost) {
+        $Global:WebuiHost = '127.0.0.1'
+    }
+    Save-State -VarNames @('WebuiHost')
+
+    $action = New-ScheduledTaskAction -Execute $webuiBin -Argument "serve --port 8080 --host $($Global:WebuiHost)"
     $trigger = New-ScheduledTaskTrigger -AtLogOn
     $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
 
     Register-ScheduledTask -TaskName 'OpenWebUI' -Action $action -Trigger $trigger -Settings $settings `
         -Description 'Open WebUI (local web interface for Ollama)' -Force | Out-Null
+    Stop-ScheduledTask -TaskName 'OpenWebUI' -ErrorAction SilentlyContinue
     Start-ScheduledTask -TaskName 'OpenWebUI'
 
     Log-Ok 'Open WebUI started. Available at http://localhost:8080'
     Log-Info 'It will restart automatically at each logon (scheduled task "OpenWebUI").'
+
+    if ($Global:WebuiHost -eq '0.0.0.0') {
+        Log-Warn 'LAN access is enabled: Open WebUI is reachable from other devices on your network.'
+        Log-Warn 'No login is required by default (WEBUI_AUTH=False): anyone on your network can use it.'
+        Log-Warn 'Restrict to this machine only: .\toggle-webui-lan.ps1 off'
+        Log-Warn "Require a login instead: [Environment]::SetEnvironmentVariable('WEBUI_AUTH','True','User'), then restart the 'OpenWebUI' task."
+    } else {
+        Log-Info 'Open WebUI is restricted to this machine only. Run .\toggle-webui-lan.ps1 on to allow access from other devices (e.g. a phone).'
+    }
 }
 
 # ---------------------------------------------------------------------------
@@ -220,9 +241,13 @@ $gpuDisplay = if ($Global:GpuName) { $Global:GpuName } else { 'none' }
 Write-Host " GPU          : $gpuDisplay ($Global:GpuVendor)"
 Write-Host " RAM          : $($Global:RamGb) GB"
 if (-not $SkipModels) { Write-Host " Tier         : $($Global:Tier)" }
-if (-not $SkipWebui)  { Write-Host ' Web UI       : http://localhost:8080' }
+if (-not $SkipWebui)  {
+    $lanState = if ($Global:WebuiHost -eq '0.0.0.0') { 'LAN access: ON' } else { 'LAN access: OFF' }
+    Write-Host " Web UI       : http://localhost:8080 ($lanState)"
+}
 Write-Host '============================================================'
 Write-Host ' Useful commands:'
-Write-Host '   ollama list                        list installed models'
-Write-Host '   Get-ScheduledTask OpenWebUI         Open WebUI task status'
+Write-Host '   ollama list                          list installed models'
+Write-Host '   Get-ScheduledTask OpenWebUI           Open WebUI task status'
+Write-Host '   .\toggle-webui-lan.ps1 on|off|status  allow/restrict LAN access to Open WebUI'
 Write-Host '============================================================'

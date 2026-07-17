@@ -67,6 +67,7 @@ tui_menu() {
 # ---------------------------------------------------------------------------
 load_state() {
   mkdir -p "$STATE_DIR"
+  # shellcheck source=/dev/null
   [ -f "$STATE_FILE" ] && . "$STATE_FILE"
   return 0
 }
