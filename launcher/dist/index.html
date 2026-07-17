@@ -13,6 +13,16 @@
   <button type="button" id="webui-btn" class="primary full">Open Web UI</button>
 
   <section>
+    <h2>Network access</h2>
+    <label class="lan-row">
+      <input type="checkbox" id="lan-toggle" />
+      Allow access from other devices on my network
+    </label>
+    <p id="lan-warning" class="lan-warning hidden">No login is required by default (WEBUI_AUTH=False): anyone on your network will be able to use Open WebUI without signing in.</p>
+    <div id="lan-status" class="lan-status"></div>
+  </section>
+
+  <section>
     <h2>Models</h2>
     <div id="models-empty" class="empty">Loading...</div>
     <table id="models-table" class="models hidden">

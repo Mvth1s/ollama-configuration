@@ -28,6 +28,22 @@ struct LogLine {
     text: String,
 }
 
+// Drives the frontend's step indicator. Linux gets one event per script
+// (ollama/gpu/models/webui) since each runs as its own child process; setup.ps1
+// runs as a single opaque elevated process on Windows, so it only ever gets
+// one combined "windows" step — a real 4-step breakdown there would just be
+// guesswork, since we can't see inside that process's own progress.
+#[derive(Debug, Clone, Serialize)]
+struct InstallStep {
+    id: String,
+    label: String,
+    status: String, // "pending" | "running" | "done" | "failed" | "skipped"
+}
+
+fn emit_step(app: &AppHandle, id: &str, label: &str, status: &str) {
+    let _ = app.emit("install-step", InstallStep { id: id.into(), label: label.into(), status: status.into() });
+}
+
 #[derive(Debug, Clone, Serialize)]
 struct InstallDone {
     success: bool,
@@ -114,32 +130,47 @@ fn detach_from_tty(cmd: &mut Command) {
     }
 }
 
-fn run_step(app: &AppHandle, label: &str, mut cmd: Command) -> Result<bool, String> {
+fn run_step(app: &AppHandle, id: &str, label: &str, mut cmd: Command) -> Result<bool, String> {
     emit_log(app, "meta", format!("--- {label} ---"));
+    emit_step(app, id, label, "running");
     let child = cmd
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
         .map_err(|e| format!("failed to start {label}: {e}"))?;
-    stream_child(app, child)
+    let ok = stream_child(app, child)?;
+    emit_step(app, id, label, if ok { "done" } else { "failed" });
+    Ok(ok)
 }
 
 #[cfg(not(target_os = "windows"))]
 fn run_linux(app: &AppHandle, repo_root: &Path, opts: &InstallOptions) -> Result<(), String> {
+    // Emitted up front so the stepper shows the full picture (including
+    // skipped steps) before anything actually starts.
+    emit_step(app, "ollama", "Installing Ollama", "pending");
+    emit_step(app, "gpu", "Configuring GPU", "pending");
+    emit_step(app, "models", "Downloading models", if opts.skip_models { "skipped" } else { "pending" });
+    emit_step(app, "webui", "Installing Open WebUI", if opts.skip_webui { "skipped" } else { "pending" });
+
     // Only 01/02 touch the system (packages, systemd units) and need root;
     // 03/04 install models and Open WebUI for the invoking user and must
     // stay unprivileged, exactly like running the scripts by hand.
-    let privileged: [(&str, &str, Vec<String>); 2] = [
-        ("Installing Ollama (privileged)", "01-install-ollama.sh", vec![]),
-        ("Configuring GPU (privileged)", "02-configure-gpu.sh", vec!["--no-tui".to_string()]),
+    let privileged: [(&str, &str, &str, Vec<String>); 2] = [
+        ("ollama", "Installing Ollama", "01-install-ollama.sh", vec![]),
+        ("gpu", "Configuring GPU", "02-configure-gpu.sh", vec!["--no-tui".to_string()]),
     ];
 
-    for (label, script, extra_args) in privileged {
+    for (id, label, script, extra_args) in privileged {
+        emit_log(
+            app,
+            "meta",
+            "This step needs administrator privileges — you may be prompted for your password.".into(),
+        );
         let mut cmd = Command::new("pkexec");
         cmd.current_dir(repo_root).arg(repo_root.join(script)).args(&extra_args);
         detach_from_tty(&mut cmd);
-        let ok = run_step(app, label, cmd)?;
+        let ok = run_step(app, id, label, cmd)?;
         if !ok {
             return Err(format!("{label} failed, see the log above."));
         }
@@ -151,7 +182,7 @@ fn run_linux(app: &AppHandle, repo_root: &Path, opts: &InstallOptions) -> Result
         if let Some(tier) = &opts.tier {
             cmd.arg(format!("--tier={tier}"));
         }
-        let ok = run_step(app, "Downloading models", cmd)?;
+        let ok = run_step(app, "models", "Downloading models", cmd)?;
         if !ok {
             return Err("Model download failed, see the log above.".into());
         }
@@ -160,7 +191,7 @@ fn run_linux(app: &AppHandle, repo_root: &Path, opts: &InstallOptions) -> Result
     if !opts.skip_webui {
         let mut cmd = Command::new(repo_root.join("04-install-webui.sh"));
         cmd.current_dir(repo_root);
-        let ok = run_step(app, "Installing Open WebUI", cmd)?;
+        let ok = run_step(app, "webui", "Installing Open WebUI", cmd)?;
         if !ok {
             return Err("Open WebUI installation failed, see the log above.".into());
         }
@@ -177,6 +208,8 @@ fn run_linux(app: &AppHandle, repo_root: &Path, opts: &InstallOptions) -> Result
 // Linux, and a single elevation prompt is enough.
 #[cfg(target_os = "windows")]
 fn run_windows(app: &AppHandle, repo_root: &Path, opts: &InstallOptions) -> Result<(), String> {
+    emit_step(app, "windows", "Running setup.ps1 (elevated)", "pending");
+
     let mut ps_args = vec![
         "-NoProfile".to_string(),
         "-ExecutionPolicy".to_string(),
@@ -206,7 +239,7 @@ fn run_windows(app: &AppHandle, repo_root: &Path, opts: &InstallOptions) -> Resu
         "Start-Process -FilePath powershell.exe -Verb RunAs -Wait -ArgumentList {arg_list}"
     ));
 
-    let ok = run_step(app, "Running setup.ps1 (elevated)", cmd)?;
+    let ok = run_step(app, "windows", "Running setup.ps1 (elevated)", cmd)?;
     if !ok {
         return Err("setup.ps1 failed, see the log above.".into());
     }

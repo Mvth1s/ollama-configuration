@@ -133,6 +133,60 @@ button:disabled {
   color: var(--err);
 }
 
+.steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+.step {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.step-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--border);
+  flex-shrink: 0;
+}
+
+.step-running .step-dot {
+  background: var(--accent);
+  box-shadow: 0 0 0 3px rgba(79, 140, 255, 0.25);
+}
+
+.step-running {
+  color: var(--accent);
+}
+
+.step-done .step-dot {
+  background: var(--ok);
+}
+
+.step-done {
+  color: var(--text);
+}
+
+.step-failed .step-dot,
+.step-aborted .step-dot {
+  background: var(--err);
+}
+
+.step-failed,
+.step-aborted {
+  color: var(--err);
+}
+
+.step-skipped {
+  opacity: 0.5;
+  text-decoration: line-through;
+}
+
 .log {
   flex: 1;
   min-height: 240px;

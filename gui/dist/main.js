@@ -10,6 +10,30 @@ const installBtn = document.getElementById('install-btn');
 const webuiBtn = document.getElementById('webui-btn');
 const logEl = document.getElementById('log');
 const statusEl = document.getElementById('status');
+const stepsEl = document.getElementById('steps');
+
+// One event per script on Linux (ollama/gpu/models/webui); a single combined
+// "windows" step on Windows, since setup.ps1 runs as one opaque elevated
+// process there. Elements are created on first sight rather than hardcoded,
+// so the same code renders either shape.
+const stepEls = new Map();
+
+function upsertStep(id, label, status) {
+  let el = stepEls.get(id);
+  if (!el) {
+    el = document.createElement('div');
+    el.innerHTML = '<span class="step-dot"></span><span class="step-label"></span>';
+    stepsEl.appendChild(el);
+    stepEls.set(id, el);
+  }
+  el.className = `step step-${status}`;
+  el.querySelector('.step-label').textContent = label;
+}
+
+function resetSteps() {
+  stepsEl.innerHTML = '';
+  stepEls.clear();
+}
 
 function appendLog(stream, text) {
   const line = document.createElement('div');
@@ -28,14 +52,31 @@ listen('install-log', (event) => {
   appendLog(event.payload.stream, event.payload.text);
 });
 
+listen('install-step', (event) => {
+  const { id, label, status } = event.payload;
+  upsertStep(id, label, status);
+});
+
 listen('install-done', (event) => {
   installBtn.disabled = false;
   installBtn.textContent = 'Install';
   setStatus(event.payload.message, event.payload.success ? 'ok' : 'error');
+
+  if (!event.payload.success) {
+    // A failed run stops at the step that failed; anything still shown as
+    // pending/running never actually ran, so make that visible instead of
+    // leaving it looking stuck.
+    for (const el of stepEls.values()) {
+      if (el.classList.contains('step-pending') || el.classList.contains('step-running')) {
+        el.className = 'step step-aborted';
+      }
+    }
+  }
 });
 
 installBtn.addEventListener('click', async () => {
   logEl.textContent = '';
+  resetSteps();
   installBtn.disabled = true;
   installBtn.textContent = 'Installing...';
   setStatus('Running...', 'running');
