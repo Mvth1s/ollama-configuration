@@ -1,0 +1,46 @@
+name: Test
+
+# Runs the bats suite (tests/*.bats) covering lib/common.sh and the four
+# numbered scripts + toggle-webui-lan.sh, and the Rust unit tests embedded in
+# gui/src-tauri and launcher/src-tauri. All bats tests run against a
+# throwaway $HOME and a stubbed PATH (see tests/test_helper.bash) so nothing
+# here ever touches the runner's real package manager, systemd, or network.
+on:
+  push:
+  pull_request:
+
+jobs:
+  bats:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install bats
+        run: sudo apt-get update -qq && sudo apt-get install -y bats
+
+      - name: Run bats suite
+        run: bats tests/*.bats
+
+  rust-unit-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [gui, launcher]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Linux WebKitGTK dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libsoup-3.0-dev librsvg2-dev
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "${{ matrix.app }}/src-tauri -> target"
+
+      - name: cargo test
+        working-directory: ${{ matrix.app }}/src-tauri
+        run: cargo test
