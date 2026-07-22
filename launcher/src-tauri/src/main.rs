@@ -54,17 +54,59 @@ fn list_models() -> Result<Vec<ModelInfo>, String> {
     let parsed: TagsResponse =
         resp.json().map_err(|e| format!("Failed to parse Ollama's response: {e}"))?;
 
-    Ok(parsed
-        .models
-        .into_iter()
-        .map(|m| {
-            let (parameter_size, quantization_level) = m
-                .details
-                .map(|d| (d.parameter_size.unwrap_or_default(), d.quantization_level.unwrap_or_default()))
-                .unwrap_or_default();
-            ModelInfo { name: m.name, size: m.size, modified_at: m.modified_at, parameter_size, quantization_level }
-        })
-        .collect())
+    Ok(parsed.models.into_iter().map(to_model_info).collect())
+}
+
+// Split out from list_models so the RawModel -> ModelInfo mapping (in
+// particular the empty-string default when `details` is missing, which
+// Ollama does for some model types) can be unit-tested without a live
+// Ollama server.
+fn to_model_info(m: RawModel) -> ModelInfo {
+    let (parameter_size, quantization_level) = m
+        .details
+        .map(|d| (d.parameter_size.unwrap_or_default(), d.quantization_level.unwrap_or_default()))
+        .unwrap_or_default();
+    ModelInfo { name: m.name, size: m.size, modified_at: m.modified_at, parameter_size, quantization_level }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn maps_full_details_from_ollamas_tags_response() {
+        let json = r#"{
+            "models": [{
+                "name": "llama3.1:8b",
+                "size": 4920753328,
+                "modified_at": "2026-01-01T00:00:00Z",
+                "details": { "parameter_size": "8B", "quantization_level": "Q4_0" }
+            }]
+        }"#;
+        let parsed: TagsResponse = serde_json::from_str(json).unwrap();
+        let info = to_model_info(parsed.models.into_iter().next().unwrap());
+
+        assert_eq!(info.name, "llama3.1:8b");
+        assert_eq!(info.size, 4920753328);
+        assert_eq!(info.parameter_size, "8B");
+        assert_eq!(info.quantization_level, "Q4_0");
+    }
+
+    #[test]
+    fn defaults_to_empty_strings_when_details_is_missing() {
+        let json = r#"{
+            "models": [{
+                "name": "custom-model:latest",
+                "size": 123,
+                "modified_at": "2026-01-01T00:00:00Z"
+            }]
+        }"#;
+        let parsed: TagsResponse = serde_json::from_str(json).unwrap();
+        let info = to_model_info(parsed.models.into_iter().next().unwrap());
+
+        assert_eq!(info.parameter_size, "");
+        assert_eq!(info.quantization_level, "");
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
