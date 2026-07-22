@@ -43,7 +43,10 @@ jobs:
       - name: Run PSScriptAnalyzer
         shell: pwsh
         run: |
-          $results = Invoke-ScriptAnalyzer -Path setup.ps1, lib/common.ps1, toggle-webui-lan.ps1 -Severity Warning, Error
+          # -Path only accepts a single string, not an array, hence the loop
+          # rather than one call over the three files.
+          $files = 'setup.ps1', 'lib/common.ps1', 'toggle-webui-lan.ps1'
+          $results = $files | ForEach-Object { Invoke-ScriptAnalyzer -Path $_ -Severity Warning, Error }
           $results | Format-Table -AutoSize
           if ($results | Where-Object { $_.Severity -eq 'Error' }) {
             throw "PSScriptAnalyzer found error-severity issues."
