@@ -57,9 +57,18 @@ struct InstallDone {
 fn find_repo_root() -> Result<PathBuf, String> {
     let start =
         std::env::current_exe().map_err(|e| format!("cannot resolve current executable path: {e}"))?;
-    let mut dir = start.parent().map(Path::to_path_buf);
+    let start_dir = start.parent().map(Path::to_path_buf).ok_or_else(|| {
+        format!("executable path {} has no parent directory", start.display())
+    })?;
 
     let marker_name = if cfg!(target_os = "windows") { "setup.ps1" } else { "setup.sh" };
+    find_marker_upwards(&start_dir, marker_name)
+}
+
+// Split out from find_repo_root so the walk-up logic can be exercised with a
+// throwaway directory tree instead of the test binary's own real location.
+fn find_marker_upwards(start_dir: &Path, marker_name: &str) -> Result<PathBuf, String> {
+    let mut dir = Some(start_dir.to_path_buf());
 
     for _ in 0..8 {
         let Some(candidate) = dir.clone() else { break };
@@ -72,6 +81,47 @@ fn find_repo_root() -> Result<PathBuf, String> {
     Err(format!(
         "could not locate {marker_name} in any parent directory of the running executable"
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn finds_marker_in_starting_directory() {
+        let tmp = std::env::temp_dir().join(format!("ollama-stack-test-{}", std::process::id()));
+        std::fs::create_dir_all(&tmp).unwrap();
+        std::fs::write(tmp.join("setup.sh"), "").unwrap();
+
+        let found = find_marker_upwards(&tmp, "setup.sh").unwrap();
+        assert_eq!(found, tmp);
+
+        std::fs::remove_dir_all(&tmp).unwrap();
+    }
+
+    #[test]
+    fn finds_marker_several_levels_up() {
+        let base = std::env::temp_dir().join(format!("ollama-stack-test-nested-{}", std::process::id()));
+        let nested = base.join("gui/src-tauri/target/debug");
+        std::fs::create_dir_all(&nested).unwrap();
+        std::fs::write(base.join("setup.sh"), "").unwrap();
+
+        let found = find_marker_upwards(&nested, "setup.sh").unwrap();
+        assert_eq!(found, base);
+
+        std::fs::remove_dir_all(&base).unwrap();
+    }
+
+    #[test]
+    fn errors_when_marker_is_never_found() {
+        let tmp = std::env::temp_dir().join(format!("ollama-stack-test-missing-{}", std::process::id()));
+        std::fs::create_dir_all(&tmp).unwrap();
+
+        let result = find_marker_upwards(&tmp, "setup.sh");
+        assert!(result.is_err());
+
+        std::fs::remove_dir_all(&tmp).unwrap();
+    }
 }
 
 fn emit_log(app: &AppHandle, stream: &str, text: String) {

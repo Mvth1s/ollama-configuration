@@ -129,7 +129,14 @@ write_amd_override() {
   {
     echo "[Service]"
     echo 'Environment="OLLAMA_VULKAN=1"'
-    [ -n "$override" ] && echo "Environment=\"HSA_OVERRIDE_GFX_VERSION=$override\""
+    # Deliberately an `if`, not `[ -n "$override" ] && echo ...`: as the last
+    # command in this group, a false `&&` would make the whole group (and
+    # therefore the pipe into `sudo tee`) exit non-zero when $override is
+    # empty, aborting the script under `set -euo pipefail` even though
+    # nothing actually went wrong (caught by tests/configure_gpu_vendor.bats).
+    if [ -n "$override" ]; then
+      echo "Environment=\"HSA_OVERRIDE_GFX_VERSION=$override\""
+    fi
   } | sudo tee /etc/systemd/system/ollama.service.d/override.conf >/dev/null
   sudo systemctl daemon-reload
 }
@@ -161,7 +168,11 @@ configure_nvidia() {
     fi
   else
     local reply
-    read -r -p "Install the Nvidia driver now? (requires a reboot afterwards) [y/N] " reply
+    # `|| reply=""`: on closed/EOF stdin (e.g. invoked from a non-interactive
+    # context despite --no-tui not being what disables this fallback), `read`
+    # itself returns non-zero, which would otherwise abort the whole script
+    # under set -euo pipefail instead of just treating it as "no".
+    read -r -p "Install the Nvidia driver now? (requires a reboot afterwards) [y/N] " reply || reply=""
     if [[ "$reply" =~ ^[yY]$ ]]; then
       install_confirmed=1
     fi
@@ -177,6 +188,13 @@ configure_nvidia() {
     log_warn "Reboot the machine then re-run this script to finish the configuration."
     exit 0
   fi
+
+  # Explicit success: without it, declining the prompt above would leave the
+  # `if [ "$install_confirmed" -eq 1 ]; then ... fi` as this function's last
+  # command, and its false test's exit status would become configure_nvidia's
+  # own return code, aborting the script under `set -euo pipefail` even
+  # though declining isn't an error (caught by tests/configure_gpu_vendor.bats).
+  return 0
 }
 
 # ---------------------------------------------------------------------------

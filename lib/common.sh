@@ -90,13 +90,16 @@ save_state() {
 # the user installs manually, and the Ollama binary itself installs the same
 # way everywhere (official script, independent of the package manager).
 # ---------------------------------------------------------------------------
+OS_RELEASE_FILE="${OS_RELEASE_FILE:-/etc/os-release}"
+
 detect_distro() {
   [ -n "${DISTRO_FAMILY:-}" ] && return 0
   DISTRO_FAMILY="unknown"
   DISTRO_PRETTY="unknown"
 
-  if [ -f /etc/os-release ]; then
-    . /etc/os-release
+  if [ -f "$OS_RELEASE_FILE" ]; then
+    # shellcheck source=/dev/null
+    . "$OS_RELEASE_FILE"
     DISTRO_PRETTY="${PRETTY_NAME:-unknown}"
     case "${ID:-}${ID_LIKE:-}" in
       *arch*)            DISTRO_FAMILY="arch" ;;
