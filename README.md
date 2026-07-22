@@ -141,6 +141,29 @@ Bash scripts are checked with [ShellCheck](https://www.shellcheck.net/) on every
 shellcheck -x *.sh lib/*.sh
 ```
 
+`setup.ps1`/`lib/common.ps1`/`toggle-webui-lan.ps1` are checked the same way with [PSScriptAnalyzer](https://github.com/PowerShell/PSScriptAnalyzer):
+
+```powershell
+Install-Module -Name PSScriptAnalyzer -Scope CurrentUser
+Invoke-ScriptAnalyzer -Path setup.ps1, lib/common.ps1, toggle-webui-lan.ps1
+```
+
+## Tests
+
+[`tests/`](tests/) holds a [bats](https://github.com/bats-core/bats-core) suite covering `lib/common.sh` and the tier/GPU-vendor/LAN-toggle logic in the numbered scripts. Every test runs against a throwaway `$HOME` and a stubbed `PATH` (see [`tests/test_helper.bash`](tests/test_helper.bash)), so it never touches the real package manager, systemd, or network — safe to run on your own machine, not just in CI:
+
+```bash
+bats tests/*.bats
+```
+
+`gui/` and `launcher/` each have a handful of `#[cfg(test)]` unit tests (repo-root discovery, Ollama API response mapping):
+
+```bash
+cd gui/src-tauri && cargo test       # or launcher/src-tauri
+```
+
+Both suites run on every push and pull request via [`.github/workflows/test.yml`](.github/workflows/test.yml); [`.github/workflows/rust-ci.yml`](.github/workflows/rust-ci.yml) additionally runs `cargo clippy`/`cargo build` for `gui/`/`launcher/` on every push and PR, so a broken build is no longer only caught at release time.
+
 ## Desktop GUI
 
 A thin [Tauri](https://tauri.app) GUI wrapping `setup.sh`/`setup.ps1` (same options, streams the scripts' output live, plus a button to open Open WebUI in its own window) is available in [`gui/`](gui/README.md), for the one-off install.
