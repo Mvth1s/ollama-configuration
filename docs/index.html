@@ -132,15 +132,10 @@
     .nav-links { display: none; }
   }
 
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --ink: #e6e6f0; --ink-2: #c6c8dd; --ink-3: #9195ae; --muted: #8a8fa8; --muted-2: #7d81a0; --muted-3: #676b8c;
-      --card: #1c1c2b; --border: #2c2d42; --border-2: #34364e; --acc-bg: #2a2a4a; --acc-ink: #b4b6ff;
-    }
-    body { background: linear-gradient(178deg, #14141f 0%, #10101a 100%); }
-    .btn-secondary { background: #1c1c2b; }
-    .platform-chip { background: #1c1c2b; }
-  }
+  /* Intentionally no dark-mode media query: this page always uses the same
+     light theme as the installer/launcher apps (docs/index.html mirrors
+     gui/dist/style.css's tokens), regardless of the visitor's OS/browser
+     theme preference. */
 </style>
 </head>
 <body>
