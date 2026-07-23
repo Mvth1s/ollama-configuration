@@ -28,6 +28,7 @@ const state = {
   detect: null, // DetectResult from the backend, once available
   models: {}, // usage -> chosen model name (mutable copy of detect.tierModels)
   openMenu: null,
+  modelCardsRevealed: false, // true after step 2's first render (see renderModelCards)
   installSteps: new Map(), // id -> { label, status }
   installDone: null, // { success, message } once install-done fires
 };
@@ -230,13 +231,20 @@ function renderModelCards() {
   modelCardsEl.innerHTML = '';
   if (!state.detect) return;
 
-  for (const usage of USAGES) {
+  // Only the very first render of this screen gets the staggered pop-in;
+  // later re-renders (toggling a "Changer" menu, ticking skip-models) just
+  // redraw instantly instead of re-playing the entrance animation.
+  const animate = !state.modelCardsRevealed;
+  state.modelCardsRevealed = true;
+
+  USAGES.forEach((usage, idx) => {
     const candidates = state.detect.candidates[usage] || [];
     const current = state.models[usage];
     const isOpen = state.openMenu === usage;
 
     const card = document.createElement('div');
-    card.className = 'model-card';
+    card.className = animate ? 'model-card is-entering' : 'model-card';
+    if (animate) card.style.animationDelay = `${idx * 90}ms`;
 
     const changeBtn = candidates.length
       ? `<button type="button" class="model-change-btn${isOpen ? ' is-open' : ''}" data-usage="${usage}">Changer ▾</button>`
@@ -264,7 +272,7 @@ function renderModelCards() {
       ${menu}
     `;
     modelCardsEl.appendChild(card);
-  }
+  });
 
   modelCardsEl.querySelectorAll('.model-change-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
