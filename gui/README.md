@@ -1,12 +1,19 @@
 # Ollama Stack GUI
 
-A thin [Tauri](https://tauri.app) desktop GUI over `setup.sh` / `setup.ps1`. It does not duplicate any GPU/RAM detection or model-tier logic: it only shows the same options as the CLI flags (`-Tier`/`--tier=`, skip models, skip Open WebUI), spawns the appropriate script for the running OS as a child process, and streams its stdout/stderr into a log pane in real time. An "Open Web UI" button opens Open WebUI (`http://127.0.0.1:8080`) in a second borderless-chrome window, reusing the same Tauri app instead of a separate webview technology.
+A [Tauri](https://tauri.app) desktop GUI over `setup.sh` / `setup.ps1`, presented as a 4-step wizard (Detection → Models → Installation → Done). It does not duplicate any GPU/RAM/CPU detection or model-tier logic: the detection screen and per-usage model picker are backed by real `--detect-only`/`-DetectOnly` calls into the same scripts (see [the repo-root `CLAUDE.md`](../CLAUDE.md#detection-only-mode-and-non-interactive-model-overrides-for-the-gui-wizard) for the JSON protocol), the install screen spawns the appropriate script for the running OS as a child process and streams its stdout/stderr into a log pane in real time. An "Open Web UI" button on the final screen opens Open WebUI (`http://127.0.0.1:8080`) in a second borderless-chrome window, reusing the same Tauri app instead of a separate webview technology.
 
 ## Architecture
 
 - `src-tauri/` — Rust backend (`src/main.rs`). No JS framework, no npm dependency for the frontend: `dist/` is plain HTML/CSS/JS served directly by Tauri (`app.withGlobalTauri = true` in `tauri.conf.json` exposes `window.__TAURI__` without an `@tauri-apps/api` import).
 - `dist/` — the frontend: `index.html`, `main.js`, `style.css`.
 - At startup, the backend walks up from the running executable's directory looking for `setup.sh` (Linux) / `setup.ps1` (Windows), so it finds the scripts whether run via `cargo run` (nested under `gui/src-tauri/target/...`) or as a standalone binary placed at the repository root.
+
+### Wizard steps
+
+1. **Detection**: calls the `detect_system` command on mount (unprivileged — no `pkexec`/UAC prompt, since reading GPU/CPU/RAM/distro needs no elevated rights), and reveals the GPU/CPU/RAM/distro rows with a short staggered animation over the already-fetched real result.
+2. **Models**: one card per usage (text/code/reasoning/embeddings), pre-filled with the tier's default model; a "Change" dropdown offers the script's real alternative candidates on Linux (hidden on Windows, which has no candidate list — see the CLAUDE.md link above).
+3. **Installation**: real progress bar and log panel, driven by the same `install-step`/`install-log`/`install-done` events as before.
+4. **Done**: summary of what was actually installed/skipped, and the "Open Web UI" button.
 
 ### Privilege elevation
 
@@ -30,7 +37,7 @@ For a distributable build (installer/AppImage/MSI), install the [Tauri CLI](http
 
 ## Known limitations
 
-- Tested on Linux (window renders, backend compiles and runs); the Windows elevation/streaming path (`Start-Process -Verb RunAs` combined with output capture) has not been verified on real Windows hardware — see the caveats already noted for `setup.ps1` itself.
+- Tested on Linux: the app was actually launched (not just compiled) against a real machine, and the Detection/Models screens were confirmed rendering real GPU/CPU/RAM/tier/candidate data end-to-end. The Windows elevation/streaming path (`Start-Process -Verb RunAs` combined with output capture) has not been verified on real Windows hardware — see the caveats already noted for `setup.ps1` itself.
 - The Linux install path requires a polkit authentication agent running in the session (`polkit-gnome-authentication-agent-1`, `polkit-kde-authentication-agent-1`, `lxqt-policykit-agent`, ...; usually already running on GNOME/KDE/most desktop environments). Without one, `01-install-ollama.sh`/`02-configure-gpu.sh` will fail at the `pkexec` step with a clear error in the log rather than prompting anywhere — install an agent or run those two scripts directly from a terminal instead.
-- The "Open Web UI" button's click was not interactively exercised (no click-simulation tool available in the environment this was built in) — verified by code review and by confirming the button renders and `open_webui_window` compiles/type-checks correctly.
-- No automated tests: this is a thin orchestration layer, verified by building and launching the app, and by reading through `setup.sh`/`setup.ps1`'s own behavior.
+- The Installation and Done screens (steps 3-4) were reviewed by reading the code — they're driven by the same `install-step`/`install-log`/`install-done` events the previous flat-form UI already used — but were not interactively clicked through end-to-end (no click-simulation tool available in the environment this was built in).
+- No automated UI tests: `src-tauri`'s pure logic (repo-root discovery, `__DETECT__` JSON parsing) has unit tests (`cargo test`); the frontend itself is verified by building, launching the app, and reading through its event handling.
