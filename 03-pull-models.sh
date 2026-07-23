@@ -76,10 +76,20 @@ CAND_L_reflexion=("deepseek-r1:32b|Large step-by-step reasoning model" "qwq:32b|
 CAND_L_embeddings=("nomic-embed-text|Standard general-purpose embeddings" "mxbai-embed-large|More accurate, heavier")
 
 FORCE_TIER=""
+DETECT_ONLY=0
+MODEL_TEXTE_OVERRIDE=""
+MODEL_CODE_OVERRIDE=""
+MODEL_REFLEXION_OVERRIDE=""
+MODEL_EMBEDDINGS_OVERRIDE=""
 for arg in "$@"; do
   case "$arg" in
     --tier=*) FORCE_TIER="${arg#*=}" ;;
     --no-tui) NO_TUI=1 ;;
+    --detect-only) DETECT_ONLY=1 ;;
+    --model-texte=*) MODEL_TEXTE_OVERRIDE="${arg#*=}" ;;
+    --model-code=*) MODEL_CODE_OVERRIDE="${arg#*=}" ;;
+    --model-reflexion=*) MODEL_REFLEXION_OVERRIDE="${arg#*=}" ;;
+    --model-embeddings=*) MODEL_EMBEDDINGS_OVERRIDE="${arg#*=}" ;;
     *) log_err "Unknown option: $arg"; exit 1 ;;
   esac
 done
@@ -113,6 +123,51 @@ compute_tier() {
 compute_tier
 
 declare -n tier_models="MODEL_${TIER}"
+
+# ---------------------------------------------------------------------------
+# Non-interactive per-usage overrides: same mutation select_models_tui
+# performs from a dialog/whiptail menu, sourced from CLI flags instead, so a
+# caller with its own picker (e.g. the Tauri GUI) can apply the user's choice
+# without a TUI backend. `if`/`fi` rather than a bare `[ ... ] && ...`, so an
+# unset override never trips `set -e` regardless of where this sits in the
+# script (see the class of bug documented in CLAUDE.md for this repo).
+# ---------------------------------------------------------------------------
+if [ -n "$MODEL_TEXTE_OVERRIDE" ]; then tier_models["texte"]="$MODEL_TEXTE_OVERRIDE"; fi
+if [ -n "$MODEL_CODE_OVERRIDE" ]; then tier_models["code"]="$MODEL_CODE_OVERRIDE"; fi
+if [ -n "$MODEL_REFLEXION_OVERRIDE" ]; then tier_models["reflexion"]="$MODEL_REFLEXION_OVERRIDE"; fi
+if [ -n "$MODEL_EMBEDDINGS_OVERRIDE" ]; then tier_models["embeddings"]="$MODEL_EMBEDDINGS_OVERRIDE"; fi
+
+# ---------------------------------------------------------------------------
+# --detect-only: report RAM/tier/resolved models/candidates as JSON for a
+# caller that wants real tier-selection data without downloading anything.
+# ---------------------------------------------------------------------------
+print_detect_json() {
+  local usage entry model desc
+  local tier_models_parts=() candidates_parts=()
+
+  for usage in texte code reflexion embeddings; do
+    tier_models_parts+=("\"$usage\":\"$(json_escape "${tier_models[$usage]}")\"")
+
+    local -n candidates="CAND_${TIER}_${usage}"
+    local cand_parts=()
+    for entry in "${candidates[@]}"; do
+      model="${entry%%|*}"
+      desc="${entry#*|}"
+      cand_parts+=("{\"model\":\"$(json_escape "$model")\",\"desc\":\"$(json_escape "$desc")\"}")
+    done
+    candidates_parts+=("\"$usage\":[$(IFS=,; echo "${cand_parts[*]}")]")
+  done
+
+  printf '__DETECT__{"ram_gb":%s,"tier":"%s","tier_models":{%s},"candidates":{%s}}\n' \
+    "$RAM_GB" "$TIER" \
+    "$(IFS=,; echo "${tier_models_parts[*]}")" \
+    "$(IFS=,; echo "${candidates_parts[*]}")"
+}
+
+if [ "$DETECT_ONLY" -eq 1 ]; then
+  print_detect_json
+  exit 0
+fi
 
 # ---------------------------------------------------------------------------
 # Interactive selection: for each usage, let the user pick among the tier's

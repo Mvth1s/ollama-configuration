@@ -107,6 +107,31 @@ mod tests {
         assert_eq!(info.parameter_size, "");
         assert_eq!(info.quantization_level, "");
     }
+
+    #[test]
+    fn parses_normal_systemctl_is_active_output() {
+        assert_eq!(parse_systemctl_is_active("active\n"), "active");
+        assert_eq!(parse_systemctl_is_active("inactive\n"), "inactive");
+        assert_eq!(parse_systemctl_is_active("failed"), "failed");
+    }
+
+    #[test]
+    fn falls_back_to_unknown_on_empty_systemctl_output() {
+        assert_eq!(parse_systemctl_is_active(""), "unknown");
+        assert_eq!(parse_systemctl_is_active("   \n"), "unknown");
+    }
+
+    #[test]
+    fn builds_ipv4_lan_url_without_brackets() {
+        let ip: std::net::IpAddr = "192.168.1.42".parse().unwrap();
+        assert_eq!(build_lan_url(ip), "http://192.168.1.42:8080");
+    }
+
+    #[test]
+    fn builds_ipv6_lan_url_with_brackets() {
+        let ip: std::net::IpAddr = "fe80::1".parse().unwrap();
+        assert_eq!(build_lan_url(ip), "http://[fe80::1]:8080");
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -188,6 +213,113 @@ fn delete_model(model: String) -> Result<(), String> {
     Ok(())
 }
 
+// Service start/stop, independent of the LAN host setting above: unlike
+// set_webui_lan, these never touch webui.env, they only start/stop the unit
+// that's already configured.
+
+#[cfg(not(target_os = "windows"))]
+fn webui_unit_installed() -> bool {
+    PathBuf::from(std::env::var("HOME").unwrap_or_default())
+        .join(".config/systemd/user/open-webui.service")
+        .exists()
+}
+
+// Split out so the empty-output edge case (e.g. systemctl present but the
+// unit was just uninstalled from under us) can be unit-tested without a
+// real systemd user session.
+fn parse_systemctl_is_active(output: &str) -> String {
+    let trimmed = output.trim();
+    if trimmed.is_empty() { "unknown".to_string() } else { trimmed.to_string() }
+}
+
+#[cfg(not(target_os = "windows"))]
+#[tauri::command]
+fn webui_service_status() -> Result<String, String> {
+    if !webui_unit_installed() {
+        return Ok("not-installed".into());
+    }
+
+    let output = Command::new("systemctl")
+        .args(["--user", "is-active", "open-webui"])
+        .output()
+        .map_err(|e| format!("Failed to run systemctl --user is-active open-webui: {e}"))?;
+
+    Ok(parse_systemctl_is_active(&String::from_utf8_lossy(&output.stdout)))
+}
+
+#[cfg(not(target_os = "windows"))]
+#[tauri::command]
+fn set_webui_service(enabled: bool) -> Result<String, String> {
+    if !webui_unit_installed() {
+        return Err("Open WebUI is not installed yet.".into());
+    }
+
+    let action = if enabled { "start" } else { "stop" };
+    let status = Command::new("systemctl")
+        .args(["--user", action, "open-webui"])
+        .status()
+        .map_err(|e| format!("Failed to run systemctl --user {action} open-webui: {e}"))?;
+
+    if status.success() {
+        Ok(if enabled { "Open WebUI started.".into() } else { "Open WebUI stopped.".into() })
+    } else {
+        Err(format!("systemctl --user {action} open-webui failed. Check `systemctl --user status open-webui`."))
+    }
+}
+
+#[cfg(target_os = "windows")]
+#[tauri::command]
+fn webui_service_status() -> Result<String, String> {
+    let script = r#"
+$task = Get-ScheduledTask -TaskName 'OpenWebUI' -ErrorAction SilentlyContinue
+if (-not $task) { Write-Output 'not-installed'; exit 0 }
+switch ($task.State) {
+    'Running'  { Write-Output 'active' }
+    'Ready'    { Write-Output 'inactive' }
+    'Disabled' { Write-Output 'inactive' }
+    default    { Write-Output 'unknown' }
+}
+"#;
+    run_powershell(script)
+}
+
+#[cfg(target_os = "windows")]
+#[tauri::command]
+fn set_webui_service(enabled: bool) -> Result<String, String> {
+    let action = if enabled { "Start-ScheduledTask" } else { "Stop-ScheduledTask" };
+    let script = format!(
+        r#"
+$task = Get-ScheduledTask -TaskName 'OpenWebUI' -ErrorAction SilentlyContinue
+if (-not $task) {{ Write-Output 'NOT_INSTALLED'; exit 0 }}
+{action} -TaskName 'OpenWebUI' -ErrorAction SilentlyContinue
+Write-Output 'OK'
+"#
+    );
+    let out = run_powershell(&script)?;
+    if out.contains("NOT_INSTALLED") {
+        Err("Open WebUI is not installed yet.".into())
+    } else {
+        Ok(if enabled { "Open WebUI started.".into() } else { "Open WebUI stopped.".into() })
+    }
+}
+
+// LAN URL for sharing (Copy button + QR code in the frontend). IPv6 needs
+// bracket syntax in a URL, hence the separate helper instead of a plain
+// format!("http://{ip}:8080").
+fn build_lan_url(ip: std::net::IpAddr) -> String {
+    match ip {
+        std::net::IpAddr::V4(v4) => format!("http://{v4}:8080"),
+        std::net::IpAddr::V6(v6) => format!("http://[{v6}]:8080"),
+    }
+}
+
+#[tauri::command]
+fn get_lan_url() -> Result<String, String> {
+    let ip = local_ip_address::local_ip()
+        .map_err(|e| format!("Could not determine a LAN address: {e}"))?;
+    Ok(build_lan_url(ip))
+}
+
 // Open WebUI's own `serve` command has no environment variable for its bind
 // address, only a --host CLI flag, so toggling LAN access means touching
 // whatever actually drives that flag: the small $HOME/.config/ollama-stack/
@@ -225,10 +357,7 @@ fn set_webui_lan(enabled: bool) -> Result<String, String> {
     }
     std::fs::write(&path, format!("WEBUI_HOST={host}\n")).map_err(|e| format!("Failed to write {}: {e}", path.display()))?;
 
-    let unit_installed = PathBuf::from(std::env::var("HOME").unwrap_or_default())
-        .join(".config/systemd/user/open-webui.service")
-        .exists();
-    if !unit_installed {
+    if !webui_unit_installed() {
         return Ok("Saved. Open WebUI is not installed yet; this will apply automatically once you install it.".into());
     }
 
@@ -338,7 +467,10 @@ fn main() {
             delete_model,
             open_webui_window,
             webui_lan_status,
-            set_webui_lan
+            set_webui_lan,
+            webui_service_status,
+            set_webui_service,
+            get_lan_url
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

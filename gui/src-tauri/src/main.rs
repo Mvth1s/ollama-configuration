@@ -7,6 +7,7 @@
 // stdout/stderr back to the frontend as Tauri events.
 
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -20,6 +21,170 @@ struct InstallOptions {
     tier: Option<String>,
     skip_models: bool,
     skip_webui: bool,
+    // Per-usage model overrides from the wizard's "Modeles" step, applied as
+    // --model-<usage>=<name> flags to 03-pull-models.sh. Linux only: setup.ps1
+    // has no per-usage override mechanism (no interactive picker on Windows
+    // either, by existing design), so this is ignored in run_windows.
+    #[serde(default)]
+    models: Option<HashMap<String, String>>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DetectOptions {
+    tier: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ModelCandidate {
+    model: String,
+    desc: String,
+}
+
+// Raw shape matching the snake_case JSON the scripts emit as-is (bash/
+// PowerShell field names), deserialized straight off the merged/parsed
+// __DETECT__ line(s) before being converted to the camelCase DetectResult
+// below for the frontend.
+#[derive(Debug, Deserialize)]
+struct DetectResultRaw {
+    distro_pretty: String,
+    gpu_vendor: String,
+    gpu_name: String,
+    cpu_model: String,
+    cpu_threads: u32,
+    ram_gb: u64,
+    tier: String,
+    tier_models: HashMap<String, String>,
+    // candidates stays empty on Windows: no CAND_<TIER>_<usage> equivalent
+    // exists there, matching the existing "no interactive model picker on
+    // Windows" design already documented for 03-pull-models.sh's TUI picker.
+    #[serde(default)]
+    candidates: HashMap<String, Vec<ModelCandidate>>,
+}
+
+// camelCase shape sent to the frontend, matching this file's existing
+// Rust->JS convention (see ModelInfo/PullProgress-style structs).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DetectResult {
+    distro_pretty: String,
+    gpu_vendor: String,
+    gpu_name: String,
+    cpu_model: String,
+    cpu_threads: u32,
+    ram_gb: u64,
+    tier: String,
+    tier_models: HashMap<String, String>,
+    candidates: HashMap<String, Vec<ModelCandidate>>,
+}
+
+impl From<DetectResultRaw> for DetectResult {
+    fn from(r: DetectResultRaw) -> Self {
+        DetectResult {
+            distro_pretty: r.distro_pretty,
+            gpu_vendor: r.gpu_vendor,
+            gpu_name: r.gpu_name,
+            cpu_model: r.cpu_model,
+            cpu_threads: r.cpu_threads,
+            ram_gb: r.ram_gb,
+            tier: r.tier,
+            tier_models: r.tier_models,
+            candidates: r.candidates,
+        }
+    }
+}
+
+// Runs a detection command to completion and returns its captured stdout.
+// Unlike run_step/stream_child (used for the real install, which streams
+// output live to the frontend as events), detection is a single fast
+// read-only call whose result is needed synchronously, so plain
+// Command::output() is enough here.
+fn run_capture(cmd: &mut Command) -> Result<String, String> {
+    let output = cmd
+        .stdin(Stdio::null())
+        .output()
+        .map_err(|e| format!("failed to run detection command: {e}"))?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("detection command failed: {stderr}"));
+    }
+    Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+}
+
+// Scripts print detection data as a single line prefixed with __DETECT__
+// (see 02-configure-gpu.sh/03-pull-models.sh/setup.ps1), so it can't be
+// confused with the human-readable log_info/Log-Info lines printed before it.
+fn extract_detect_json(output: &str) -> Result<serde_json::Value, String> {
+    for line in output.lines() {
+        if let Some(json_str) = line.strip_prefix("__DETECT__") {
+            return serde_json::from_str(json_str)
+                .map_err(|e| format!("failed to parse detection output: {e}"));
+        }
+    }
+    Err("no detection output (__DETECT__ line) found in script output".into())
+}
+
+// Linux detection is split across two scripts (GPU/distro/CPU from
+// 02-configure-gpu.sh, RAM/tier/models/candidates from 03-pull-models.sh),
+// each already read-only and reusable as-is; their JSON objects are merged
+// into one before deserializing into DetectResult.
+#[cfg(not(target_os = "windows"))]
+fn detect_linux(repo_root: &Path, tier: &Option<String>) -> Result<DetectResult, String> {
+    let mut gpu_cmd = Command::new(repo_root.join("02-configure-gpu.sh"));
+    gpu_cmd.current_dir(repo_root).args(["--detect-only", "--no-tui"]);
+    let gpu_json = extract_detect_json(&run_capture(&mut gpu_cmd)?)?;
+
+    let mut models_cmd = Command::new(repo_root.join("03-pull-models.sh"));
+    models_cmd.current_dir(repo_root).args(["--detect-only", "--no-tui"]);
+    if let Some(t) = tier {
+        models_cmd.arg(format!("--tier={t}"));
+    }
+    let models_json = extract_detect_json(&run_capture(&mut models_cmd)?)?;
+
+    let mut merged = gpu_json.as_object().cloned().unwrap_or_default();
+    if let Some(obj) = models_json.as_object() {
+        merged.extend(obj.clone());
+    }
+    let raw: DetectResultRaw = serde_json::from_value(serde_json::Value::Object(merged))
+        .map_err(|e| format!("failed to assemble detection result: {e}"))?;
+    Ok(raw.into())
+}
+
+// Windows detection needs no elevation (Get-RamGb/Get-GpuVendor/Get-CpuInfo
+// are read-only CIM queries), so this calls powershell.exe directly rather
+// than through the Start-Process -Verb RunAs wrapper run_windows uses for
+// the real (privileged) install below.
+#[cfg(target_os = "windows")]
+fn detect_windows(repo_root: &Path, tier: &Option<String>) -> Result<DetectResult, String> {
+    let mut args = vec![
+        "-NoProfile".to_string(),
+        "-ExecutionPolicy".to_string(),
+        "Bypass".to_string(),
+        "-File".to_string(),
+        repo_root.join("setup.ps1").to_string_lossy().to_string(),
+        "-DetectOnly".to_string(),
+    ];
+    if let Some(t) = tier {
+        args.push("-Tier".to_string());
+        args.push(t.clone());
+    }
+
+    let mut cmd = Command::new("powershell.exe");
+    cmd.current_dir(repo_root).args(&args);
+    let json = extract_detect_json(&run_capture(&mut cmd)?)?;
+    let raw: DetectResultRaw =
+        serde_json::from_value(json).map_err(|e| format!("failed to parse detection result: {e}"))?;
+    Ok(raw.into())
+}
+
+#[tauri::command]
+fn detect_system(options: DetectOptions) -> Result<DetectResult, String> {
+    let repo_root = find_repo_root()?;
+    #[cfg(target_os = "windows")]
+    return detect_windows(&repo_root, &options.tier);
+    #[cfg(not(target_os = "windows"))]
+    return detect_linux(&repo_root, &options.tier);
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -121,6 +286,46 @@ mod tests {
         assert!(result.is_err());
 
         std::fs::remove_dir_all(&tmp).unwrap();
+    }
+
+    #[test]
+    fn extracts_detect_json_ignoring_human_readable_log_lines() {
+        let output = "[INFO] Detected distro: Ubuntu 24.04 LTS (family: debian)\n\
+                       [INFO] GPU selected for acceleration: none (none)\n\
+                       __DETECT__{\"distro_pretty\":\"Ubuntu 24.04 LTS\",\"gpu_vendor\":\"none\"}\n";
+
+        let value = extract_detect_json(output).unwrap();
+        assert_eq!(value["distro_pretty"], "Ubuntu 24.04 LTS");
+        assert_eq!(value["gpu_vendor"], "none");
+    }
+
+    #[test]
+    fn errors_when_no_detect_line_present() {
+        let output = "[INFO] just some regular log output\n";
+        assert!(extract_detect_json(output).is_err());
+    }
+
+    #[test]
+    fn merges_gpu_and_models_detect_json_into_one_result() {
+        let gpu_json: serde_json::Value = serde_json::from_str(
+            r#"{"distro_pretty":"Ubuntu 24.04 LTS","gpu_vendor":"none","gpu_name":"","cpu_model":"Generic CPU","cpu_threads":8}"#,
+        )
+        .unwrap();
+        let models_json: serde_json::Value = serde_json::from_str(
+            r#"{"ram_gb":16,"tier":"S","tier_models":{"texte":"llama3.1:8b"},"candidates":{"texte":[{"model":"llama3.1:8b","desc":"Well-balanced generalist"}]}}"#,
+        )
+        .unwrap();
+
+        let mut merged = gpu_json.as_object().cloned().unwrap();
+        merged.extend(models_json.as_object().cloned().unwrap());
+        let raw: DetectResultRaw =
+            serde_json::from_value(serde_json::Value::Object(merged)).unwrap();
+        let result: DetectResult = raw.into();
+
+        assert_eq!(result.distro_pretty, "Ubuntu 24.04 LTS");
+        assert_eq!(result.tier, "S");
+        assert_eq!(result.tier_models["texte"], "llama3.1:8b");
+        assert_eq!(result.candidates["texte"][0].model, "llama3.1:8b");
     }
 }
 
@@ -231,6 +436,11 @@ fn run_linux(app: &AppHandle, repo_root: &Path, opts: &InstallOptions) -> Result
         cmd.current_dir(repo_root).arg("--no-tui");
         if let Some(tier) = &opts.tier {
             cmd.arg(format!("--tier={tier}"));
+        }
+        if let Some(models) = &opts.models {
+            for (usage, model) in models {
+                cmd.arg(format!("--model-{usage}={model}"));
+            }
         }
         let ok = run_step(app, "models", "Downloading models", cmd)?;
         if !ok {
@@ -344,7 +554,7 @@ fn open_webui_window(app: AppHandle) -> Result<(), String> {
 
 fn main() {
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![run_install, open_webui_window])
+        .invoke_handler(tauri::generate_handler![run_install, open_webui_window, detect_system])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

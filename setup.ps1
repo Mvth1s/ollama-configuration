@@ -29,6 +29,13 @@
 .PARAMETER SkipWebui
     Skip Open WebUI installation.
 
+.PARAMETER DetectOnly
+    Print detected GPU/CPU/RAM/tier information as JSON and exit, without
+    installing anything. Used by the Tauri GUI's detection screen; the
+    underlying Get-RamGb/Get-GpuVendor/Get-CpuInfo/Get-ModelTier calls are
+    all read-only, same as the -DetectOnly path in 02-configure-gpu.sh and
+    03-pull-models.sh on the Linux side.
+
 .EXAMPLE
     .\setup.ps1
 
@@ -42,7 +49,9 @@ param(
 
     [switch]$SkipModels,
 
-    [switch]$SkipWebui
+    [switch]$SkipWebui,
+
+    [switch]$DetectOnly
 )
 
 $ErrorActionPreference = 'Stop'
@@ -215,6 +224,34 @@ function Install-OpenWebUI {
 # Main
 # ---------------------------------------------------------------------------
 Load-State
+
+if ($DetectOnly) {
+    Get-RamGb | Out-Null
+    Get-GpuVendor | Out-Null
+    Get-CpuInfo | Out-Null
+    Get-ModelTier
+
+    # No CAND_<TIER>_<usage> equivalent exists on Windows (no interactive
+    # model picker here, by design - see Get-ModelTier/Install-Model above),
+    # so only the resolved per-usage defaults are reported, unlike the
+    # Linux --detect-only path which also reports alternative candidates.
+    # snake_case keys, matching the JSON emitted by 02-configure-gpu.sh /
+    # 03-pull-models.sh --detect-only, so the Rust side parses both
+    # platforms' output with the same field names.
+    $result = [ordered]@{
+        distro_pretty = 'Windows'
+        gpu_vendor    = $Global:GpuVendor
+        gpu_name      = $Global:GpuName
+        cpu_model     = $Global:CpuModel
+        cpu_threads   = $Global:CpuThreads
+        ram_gb        = $Global:RamGb
+        tier          = $Global:Tier
+        tier_models   = $ModelTiers[$Global:Tier]
+    }
+    Write-Output ('__DETECT__' + ($result | ConvertTo-Json -Compress -Depth 4))
+    exit 0
+}
+
 Get-RamGb | Out-Null
 Install-OllamaWindows
 Set-GpuConfig

@@ -145,3 +145,28 @@ detect_ram() {
   log_info "Detected total RAM: ${RAM_GB} GB"
   save_state RAM_GB
 }
+
+# ---------------------------------------------------------------------------
+# CPU: model name + logical thread count, for display purposes only (no
+# tier/config decision depends on this, unlike RAM/GPU).
+# ---------------------------------------------------------------------------
+detect_cpu() {
+  [ -n "${CPU_MODEL:-}" ] && return 0
+  CPU_MODEL=$(awk -F': ' '/^model name/{print $2; exit}' /proc/cpuinfo 2>/dev/null || true)
+  [ -z "$CPU_MODEL" ] && CPU_MODEL="unknown"
+  CPU_THREADS=$(nproc 2>/dev/null || echo 1)
+  log_info "Detected CPU: $CPU_MODEL ($CPU_THREADS threads)"
+  save_state CPU_MODEL CPU_THREADS
+}
+
+# ---------------------------------------------------------------------------
+# Minimal JSON string escaping (backslash and double-quote only — the values
+# passed through this ever originate from /etc/os-release, lspci, or
+# /proc/cpuinfo, none of which contain control characters in practice).
+# ---------------------------------------------------------------------------
+json_escape() {
+  local s="$1"
+  s="${s//\\/\\\\}"
+  s="${s//\"/\\\"}"
+  printf '%s' "$s"
+}
