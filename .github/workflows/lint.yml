@@ -45,9 +45,29 @@ jobs:
         run: |
           # -Path only accepts a single string, not an array, hence the loop
           # rather than one call over the three files.
+          #
+          # Excluded rules are deliberate design choices documented in
+          # CLAUDE.md, not lint debt:
+          #   PSAvoidGlobalVars      - $Global:* is this script's state-sharing
+          #                            mechanism, the Windows counterpart to
+          #                            state.env on Linux.
+          #   PSAvoidUsingWriteHost  - Write-Host -ForegroundColor is used
+          #                            over ANSI codes for PowerShell 5.1
+          #                            console compatibility.
+          #   PSUseApprovedVerbs     - Log-Info/Log-Ok/etc. mirror lib/common.sh's
+          #                            log_info/log_ok naming on purpose.
+          #   PSReviewUnusedParameter - false positive: $Tier (the script
+          #                            param) is read inside Get-ModelTier via
+          #                            PowerShell's normal script-scope
+          #                            fallback, which this rule's static
+          #                            analysis doesn't trace across functions.
+          #   PSUseShouldProcessForStateChangingFunctions - Set-GpuConfig is
+          #                            read-only (detects and logs, does not
+          #                            mutate anything), despite the Set- verb.
+          $excluded = 'PSAvoidGlobalVars', 'PSAvoidUsingWriteHost', 'PSUseApprovedVerbs', 'PSReviewUnusedParameter', 'PSUseShouldProcessForStateChangingFunctions'
           $files = 'setup.ps1', 'lib/common.ps1', 'toggle-webui-lan.ps1'
-          $results = $files | ForEach-Object { Invoke-ScriptAnalyzer -Path $_ -Severity Warning, Error }
+          $results = $files | ForEach-Object { Invoke-ScriptAnalyzer -Path $_ -Severity Warning, Error -ExcludeRule $excluded }
           $results | Format-Table -AutoSize
-          if ($results | Where-Object { $_.Severity -eq 'Error' }) {
-            throw "PSScriptAnalyzer found error-severity issues."
+          if ($results) {
+            throw "PSScriptAnalyzer found $($results.Count) issue(s)."
           }

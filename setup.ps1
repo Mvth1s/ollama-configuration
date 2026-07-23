@@ -124,7 +124,7 @@ function Get-ModelTier {
     Save-State -VarNames @('Tier')
 }
 
-function Install-Models {
+function Install-Model {
     $models = $ModelTiers[$Global:Tier]
     foreach ($usage in @('texte', 'code', 'reflexion', 'embeddings')) {
         $model = $models[$usage]
@@ -221,7 +221,7 @@ Set-GpuConfig
 
 if (-not $SkipModels) {
     Get-ModelTier
-    Install-Models
+    Install-Model
 } else {
     Log-Info 'Model download skipped (-SkipModels).'
 }
