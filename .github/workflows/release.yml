@@ -1,5 +1,12 @@
 name: Release
 
+# A tag/release created here is pushed using the default GITHUB_TOKEN, which
+# GitHub Actions deliberately excludes from triggering other workflows'
+# push/tag events (anti-recursion measure) - so build-desktop.yml's
+# `on: push: tags:` never fired on its own after the very first real
+# release (v1.0.0: tag and GitHub Release were created, but zero installer
+# assets were attached). Explicitly dispatching it below is the fix:
+# workflow_dispatch is expressly exempted from that restriction.
 on:
   push:
     branches:
@@ -9,6 +16,7 @@ permissions:
   contents: write
   issues: write
   pull-requests: write
+  actions: write
 
 jobs:
   release:
@@ -26,6 +34,17 @@ jobs:
         run: npm ci
 
       - name: Run semantic-release
+        id: semantic
+        uses: cycjimmy/semantic-release-action@v6
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npx semantic-release
+
+      # semantic_release_action wraps the same npx semantic-release run
+      # this repo used directly before, just exposing its outcome as step
+      # outputs (new_release_published, new_release_git_tag) - config is
+      # unchanged, still driven entirely by .releaserc.json/package.json.
+      - name: Trigger desktop bundle build
+        if: steps.semantic.outputs.new_release_published == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run build-desktop.yml --ref "${{ steps.semantic.outputs.new_release_git_tag }}"
