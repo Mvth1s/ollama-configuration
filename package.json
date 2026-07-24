@@ -1,0 +1,16 @@
+{
+  "name": "ollama-configuration",
+  "private": true,
+  "description": "Release tooling only (commitlint, husky, semantic-release) -- not a JS project, the gui/ and launcher/ frontends have no npm dependency.",
+  "scripts": {
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.5.0",
+    "@commitlint/config-conventional": "^19.5.0",
+    "husky": "^9.1.6",
+    "semantic-release": "^24.1.2",
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/git": "^10.0.1"
+  }
+}

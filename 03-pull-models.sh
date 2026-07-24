@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+# All MODEL_<TIER> / CAND_<TIER>_<usage> arrays below are only ever read
+# through dynamic `declare -n` namerefs built from tier/usage strings at
+# runtime (compute_tier, select_models_tui), which ShellCheck's static
+# analysis cannot follow — hence this file-wide disable rather than ~20
+# repeats of the same false positive.
+# shellcheck disable=SC2034
 set -euo pipefail
 cd "$(dirname "$0")"
 source lib/common.sh
@@ -49,31 +55,41 @@ declare -A MODEL_L=(
 # Interactive candidates per tier/usage, format "model|short description".
 # The first entry always matches the corresponding MODEL_<TIER> default above.
 # ---------------------------------------------------------------------------
-CAND_XS_texte=("llama3.2:3b|Rapide, bon généraliste pour petite config" "qwen2.5:3b|Alternative multilingue" "phi3.5:3.8b|Compact, bon raisonnement de base")
-CAND_XS_code=("qwen2.5-coder:3b|Généraliste code léger" "starcoder2:3b|Alternative orientée complétion")
-CAND_XS_reflexion=("deepseek-r1:1.5b|Raisonnement pas à pas, très léger" "qwen2.5:1.5b|Alternative généraliste légère")
-CAND_XS_embeddings=("nomic-embed-text|Embeddings généralistes, standard" "all-minilm|Plus léger, plus rapide")
+CAND_XS_texte=("llama3.2:3b|Fast, solid generalist for low-end hardware" "qwen2.5:3b|Multilingual alternative" "phi3.5:3.8b|Compact, decent basic reasoning")
+CAND_XS_code=("qwen2.5-coder:3b|Lightweight general-purpose coding model" "starcoder2:3b|Alternative geared toward completion")
+CAND_XS_reflexion=("deepseek-r1:1.5b|Step-by-step reasoning, very lightweight" "qwen2.5:1.5b|Lightweight generalist alternative")
+CAND_XS_embeddings=("nomic-embed-text|Standard general-purpose embeddings" "all-minilm|Lighter, faster")
 
-CAND_S_texte=("llama3.1:8b|Généraliste équilibré" "gemma2:9b|Alternative Google, bon suivi d'instructions" "mistral:7b|Rapide, bon compromis")
-CAND_S_code=("qwen2.5-coder:7b|Généraliste code" "codellama:7b|Alternative Meta, orientée complétion")
-CAND_S_reflexion=("deepseek-r1:7b|Raisonnement pas à pas" "qwen2.5:7b|Alternative généraliste")
-CAND_S_embeddings=("nomic-embed-text|Embeddings généralistes, standard" "all-minilm|Plus léger, plus rapide")
+CAND_S_texte=("llama3.1:8b|Well-balanced generalist" "gemma2:9b|Google alternative, good instruction following" "mistral:7b|Fast, good tradeoff")
+CAND_S_code=("qwen2.5-coder:7b|General-purpose coding model" "codellama:7b|Meta alternative, geared toward completion")
+CAND_S_reflexion=("deepseek-r1:7b|Step-by-step reasoning" "qwen2.5:7b|Generalist alternative")
+CAND_S_embeddings=("nomic-embed-text|Standard general-purpose embeddings" "all-minilm|Lighter, faster")
 
-CAND_M_texte=("gemma3:12b|Généraliste Google récent" "mistral-nemo:12b|Alternative Mistral/Nvidia" "qwen2.5:14b|Plus grand, meilleur raisonnement général")
-CAND_M_code=("devstral:24b|Orienté agents de code" "qwen2.5-coder:14b|Alternative plus légère")
-CAND_M_reflexion=("deepseek-r1:14b|Raisonnement pas à pas" "qwen2.5:14b|Alternative généraliste")
-CAND_M_embeddings=("nomic-embed-text|Embeddings généralistes, standard" "mxbai-embed-large|Plus précis, plus lourd")
+CAND_M_texte=("gemma3:12b|Recent Google generalist" "mistral-nemo:12b|Mistral/Nvidia alternative" "qwen2.5:14b|Bigger, better general reasoning")
+CAND_M_code=("devstral:24b|Geared toward coding agents" "qwen2.5-coder:14b|Lighter alternative")
+CAND_M_reflexion=("deepseek-r1:14b|Step-by-step reasoning" "qwen2.5:14b|Generalist alternative")
+CAND_M_embeddings=("nomic-embed-text|Standard general-purpose embeddings" "mxbai-embed-large|More accurate, heavier")
 
-CAND_L_texte=("gemma3:27b|Généraliste Google, gros modèle" "qwen2.5:32b|Alternative Alibaba" "mixtral:8x7b|Mixture-of-experts, bon compromis vitesse/qualité")
-CAND_L_code=("qwen2.5-coder:32b|Généraliste code, gros modèle" "devstral:24b|Alternative orientée agents de code")
-CAND_L_reflexion=("deepseek-r1:32b|Raisonnement pas à pas, gros modèle" "qwq:32b|Alternative Alibaba orientée raisonnement")
-CAND_L_embeddings=("nomic-embed-text|Embeddings généralistes, standard" "mxbai-embed-large|Plus précis, plus lourd")
+CAND_L_texte=("gemma3:27b|Large Google generalist" "qwen2.5:32b|Alibaba alternative" "mixtral:8x7b|Mixture-of-experts, good speed/quality tradeoff")
+CAND_L_code=("qwen2.5-coder:32b|Large general-purpose coding model" "devstral:24b|Alternative geared toward coding agents")
+CAND_L_reflexion=("deepseek-r1:32b|Large step-by-step reasoning model" "qwq:32b|Alibaba alternative geared toward reasoning")
+CAND_L_embeddings=("nomic-embed-text|Standard general-purpose embeddings" "mxbai-embed-large|More accurate, heavier")
 
 FORCE_TIER=""
+DETECT_ONLY=0
+MODEL_TEXTE_OVERRIDE=""
+MODEL_CODE_OVERRIDE=""
+MODEL_REFLEXION_OVERRIDE=""
+MODEL_EMBEDDINGS_OVERRIDE=""
 for arg in "$@"; do
   case "$arg" in
     --tier=*) FORCE_TIER="${arg#*=}" ;;
     --no-tui) NO_TUI=1 ;;
+    --detect-only) DETECT_ONLY=1 ;;
+    --model-texte=*) MODEL_TEXTE_OVERRIDE="${arg#*=}" ;;
+    --model-code=*) MODEL_CODE_OVERRIDE="${arg#*=}" ;;
+    --model-reflexion=*) MODEL_REFLEXION_OVERRIDE="${arg#*=}" ;;
+    --model-embeddings=*) MODEL_EMBEDDINGS_OVERRIDE="${arg#*=}" ;;
     *) log_err "Unknown option: $arg"; exit 1 ;;
   esac
 done
@@ -109,6 +125,51 @@ compute_tier
 declare -n tier_models="MODEL_${TIER}"
 
 # ---------------------------------------------------------------------------
+# Non-interactive per-usage overrides: same mutation select_models_tui
+# performs from a dialog/whiptail menu, sourced from CLI flags instead, so a
+# caller with its own picker (e.g. the Tauri GUI) can apply the user's choice
+# without a TUI backend. `if`/`fi` rather than a bare `[ ... ] && ...`, so an
+# unset override never trips `set -e` regardless of where this sits in the
+# script (see the class of bug documented in CLAUDE.md for this repo).
+# ---------------------------------------------------------------------------
+if [ -n "$MODEL_TEXTE_OVERRIDE" ]; then tier_models["texte"]="$MODEL_TEXTE_OVERRIDE"; fi
+if [ -n "$MODEL_CODE_OVERRIDE" ]; then tier_models["code"]="$MODEL_CODE_OVERRIDE"; fi
+if [ -n "$MODEL_REFLEXION_OVERRIDE" ]; then tier_models["reflexion"]="$MODEL_REFLEXION_OVERRIDE"; fi
+if [ -n "$MODEL_EMBEDDINGS_OVERRIDE" ]; then tier_models["embeddings"]="$MODEL_EMBEDDINGS_OVERRIDE"; fi
+
+# ---------------------------------------------------------------------------
+# --detect-only: report RAM/tier/resolved models/candidates as JSON for a
+# caller that wants real tier-selection data without downloading anything.
+# ---------------------------------------------------------------------------
+print_detect_json() {
+  local usage entry model desc
+  local tier_models_parts=() candidates_parts=()
+
+  for usage in texte code reflexion embeddings; do
+    tier_models_parts+=("\"$usage\":\"$(json_escape "${tier_models[$usage]}")\"")
+
+    local -n candidates="CAND_${TIER}_${usage}"
+    local cand_parts=()
+    for entry in "${candidates[@]}"; do
+      model="${entry%%|*}"
+      desc="${entry#*|}"
+      cand_parts+=("{\"model\":\"$(json_escape "$model")\",\"desc\":\"$(json_escape "$desc")\"}")
+    done
+    candidates_parts+=("\"$usage\":[$(IFS=,; echo "${cand_parts[*]}")]")
+  done
+
+  printf '__DETECT__{"ram_gb":%s,"tier":"%s","tier_models":{%s},"candidates":{%s}}\n' \
+    "$RAM_GB" "$TIER" \
+    "$(IFS=,; echo "${tier_models_parts[*]}")" \
+    "$(IFS=,; echo "${candidates_parts[*]}")"
+}
+
+if [ "$DETECT_ONLY" -eq 1 ]; then
+  print_detect_json
+  exit 0
+fi
+
+# ---------------------------------------------------------------------------
 # Interactive selection: for each usage, let the user pick among the tier's
 # candidates instead of the single default. Skipped (default kept) when the
 # tier was forced, or when no TUI backend is available/usable.
@@ -125,11 +186,16 @@ select_models_tui() {
       menu_args+=("$model" "$desc")
     done
 
-    chosen=$(tui_menu "Modèle $usage (tier $TIER)" "Choisissez le modèle $usage :" "${menu_args[@]}") || chosen=""
+    chosen=$(tui_menu "$usage model (tier $TIER)" "Choose the $usage model:" "${menu_args[@]}") || chosen=""
     if [ -n "$chosen" ]; then
+      # tier_models is a nameref to an associative array (string keys), not
+      # an indexed one: dropping $ here would silently write to a literal
+      # "usage" key instead of the intended tier/usage, so keep it despite
+      # ShellCheck's arithmetic-subscript suggestion (verified in bash).
+      # shellcheck disable=SC2004
       tier_models[$usage]="$chosen"
     else
-      log_warn "Sélection annulée pour $usage, valeur par défaut conservée (${tier_models[$usage]})."
+      log_warn "Selection cancelled for $usage, default kept (${tier_models[$usage]})."
     fi
   done
 }

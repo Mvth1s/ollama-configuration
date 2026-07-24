@@ -1,0 +1,15 @@
+# Rust / Tauri build artifacts (gui/, launcher/)
+/gui/src-tauri/target/
+/gui/src-tauri/gen/schemas/
+/gui/node_modules/
+/launcher/src-tauri/target/
+/launcher/src-tauri/gen/schemas/
+/launcher/node_modules/
+
+# WebDriver e2e test runners (gui/e2e-tests, launcher/e2e-tests) - devDeps
+# only, never shipped with either app
+/gui/e2e-tests/node_modules/
+/launcher/e2e-tests/node_modules/
+
+# Release tooling (root package.json: commitlint/husky/semantic-release)
+/node_modules/

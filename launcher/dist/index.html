@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Ollama Launcher</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<main>
+  <h1>Ollama Launcher</h1>
+
+  <!-- Service status -->
+  <div id="service-card" class="service-card">
+    <span class="service-icon">💬</span>
+    <div class="service-body">
+      <div class="service-title">Open WebUI</div>
+      <div class="service-status-row">
+        <span id="service-dot" class="status-dot"></span>
+        <span id="service-status-text" class="service-status-text">Vérification...</span>
+      </div>
+    </div>
+    <button type="button" id="service-toggle-btn" class="service-toggle-btn" disabled>...</button>
+  </div>
+
+  <!-- LAN access -->
+  <div id="lan-card" class="lan-card">
+    <div class="lan-top">
+      <span id="lan-icon" class="lan-icon">🔒</span>
+      <div class="lan-body">
+        <div class="lan-title">Accès réseau local (LAN)</div>
+        <div id="lan-state-label" class="lan-state-label">Local uniquement</div>
+      </div>
+      <button type="button" id="lan-toggle" class="toggle-track" aria-label="Basculer l'accès LAN">
+        <span class="toggle-knob"></span>
+      </button>
+    </div>
+    <p id="lan-explain" class="lan-explain"></p>
+
+    <div id="lan-url-wrap" class="lan-url-wrap hidden">
+      <div class="lan-url-row">
+        <span class="lan-url-icon">🔗</span>
+        <span id="lan-url-text" class="lan-url-text">-</span>
+        <button type="button" id="copy-url-btn" class="copy-btn">Copier</button>
+      </div>
+      <button type="button" id="qr-toggle-btn" class="qr-toggle-btn">Afficher le QR code</button>
+      <div id="qr-wrap" class="qr-wrap hidden">
+        <div id="qr-canvas" class="qr-canvas"></div>
+        <div class="qr-hint">Scanne pour ouvrir sur ton téléphone</div>
+      </div>
+    </div>
+
+    <div id="sec-note" class="sec-note">
+      <span id="sec-icon">🛡</span>
+      <span id="sec-text"></span>
+    </div>
+  </div>
+
+  <button type="button" id="webui-btn" class="primary full">Ouvrir Open WebUI</button>
+
+  <section>
+    <h2>Models</h2>
+    <div id="models-empty" class="empty">Loading...</div>
+    <table id="models-table" class="models hidden">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Size</th>
+          <th>Params</th>
+          <th>Quant</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="models-body"></tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Pull a model</h2>
+    <div class="pull-row">
+      <input type="text" id="pull-input" placeholder="e.g. llama3.2:3b" />
+      <button type="button" id="pull-btn">Pull</button>
+    </div>
+    <div id="pull-status" class="pull-status"></div>
+  </section>
+
+  <p id="error" class="error hidden"></p>
+</main>
+<script src="qrcode.js"></script>
+<script src="main.js"></script>
+</body>
+</html>

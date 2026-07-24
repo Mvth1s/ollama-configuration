@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Ollama Configuration</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<main>
+  <nav id="stepper" class="stepper" aria-label="Etapes de l'installation"></nav>
+
+  <div class="content">
+    <header class="step-header">
+      <span id="step-icon" class="step-icon" aria-hidden="true"></span>
+      <div class="step-header-text">
+        <div class="step-title-row">
+          <h1 id="step-title"></h1>
+          <span id="step-meta" class="step-meta"></span>
+        </div>
+        <p id="step-subtitle" class="step-subtitle"></p>
+      </div>
+      <span id="config-chip" class="config-chip hidden"></span>
+    </header>
+
+    <!-- Step 1: Detection -->
+    <section id="step-1" class="step-panel">
+      <div id="detect-rows" class="detect-rows"></div>
+      <div id="detect-result" class="detect-result hidden">
+        <span id="detect-result-text"></span>
+      </div>
+      <p id="detect-error" class="detect-error hidden"></p>
+    </section>
+
+    <!-- Step 2: Models -->
+    <section id="step-2" class="step-panel hidden">
+      <div id="model-cards" class="model-cards"></div>
+      <p id="models-footer" class="models-footer"></p>
+    </section>
+
+    <!-- Step 3: Installation -->
+    <section id="step-3" class="step-panel hidden">
+      <div class="progress-row">
+        <span id="install-label" class="install-label"></span>
+        <span id="install-pct" class="install-pct"></span>
+      </div>
+      <div class="progress-track"><div id="progress-fill" class="progress-fill"></div></div>
+      <pre id="install-log" class="install-log" aria-live="polite"></pre>
+    </section>
+
+    <!-- Step 4: Done -->
+    <section id="step-4" class="step-panel hidden">
+      <div class="done-wrap">
+        <div class="done-check">
+          <span class="done-ring"></span>
+          <span class="done-circle">
+            <svg width="34" height="34" viewBox="0 0 38 38" fill="none">
+              <path d="M10 19.5L16.5 26L28 13" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </span>
+        </div>
+        <h2>Votre IA locale est prête</h2>
+        <p id="done-subtitle" class="done-subtitle"></p>
+
+        <div id="summary" class="summary"></div>
+
+        <button type="button" id="webui-btn" class="btn-open-webui">
+          <span id="webui-btn-label">Ouvrir Open WebUI</span>
+        </button>
+
+        <div class="done-badges">
+          <span>100&nbsp;% local</span>
+          <span>Gratuit et open source</span>
+          <span>Vos données restent chez vous</span>
+        </div>
+      </div>
+    </section>
+
+    <div id="options-strip" class="options-strip">
+      <span class="options-label">Options</span>
+      <label class="chk">
+        <input type="checkbox" id="skip-models" autocomplete="off" />
+        <span class="chk-box"></span>
+        Ignorer le téléchargement des modèles
+      </label>
+      <label class="chk">
+        <input type="checkbox" id="skip-webui" autocomplete="off" />
+        <span class="chk-box"></span>
+        Ignorer l'installation d'Open WebUI
+      </label>
+    </div>
+
+    <div class="nav-row">
+      <button type="button" id="back-btn" class="btn-back hidden">
+        <span>&larr;</span> Retour
+      </button>
+      <div id="dots" class="dots"></div>
+      <button type="button" id="next-btn" class="btn-primary">Continuer</button>
+    </div>
+  </div>
+</main>
+<script src="main.js"></script>
+</body>
+</html>

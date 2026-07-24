@@ -27,9 +27,11 @@ source lib/common.sh
 # Usage: ./02-configure-gpu.sh [--no-tui]
 # =============================================================================
 
+DETECT_ONLY=0
 for arg in "$@"; do
   case "$arg" in
     --no-tui) NO_TUI=1 ;;
+    --detect-only) DETECT_ONLY=1 ;;
     *) log_err "Unknown option: $arg"; exit 1 ;;
   esac
 done
@@ -129,7 +131,14 @@ write_amd_override() {
   {
     echo "[Service]"
     echo 'Environment="OLLAMA_VULKAN=1"'
-    [ -n "$override" ] && echo "Environment=\"HSA_OVERRIDE_GFX_VERSION=$override\""
+    # Deliberately an `if`, not `[ -n "$override" ] && echo ...`: as the last
+    # command in this group, a false `&&` would make the whole group (and
+    # therefore the pipe into `sudo tee`) exit non-zero when $override is
+    # empty, aborting the script under `set -euo pipefail` even though
+    # nothing actually went wrong (caught by tests/configure_gpu_vendor.bats).
+    if [ -n "$override" ]; then
+      echo "Environment=\"HSA_OVERRIDE_GFX_VERSION=$override\""
+    fi
   } | sudo tee /etc/systemd/system/ollama.service.d/override.conf >/dev/null
   sudo systemctl daemon-reload
 }
@@ -161,7 +170,11 @@ configure_nvidia() {
     fi
   else
     local reply
-    read -r -p "Install the Nvidia driver now? (requires a reboot afterwards) [y/N] " reply
+    # `|| reply=""`: on closed/EOF stdin (e.g. invoked from a non-interactive
+    # context despite --no-tui not being what disables this fallback), `read`
+    # itself returns non-zero, which would otherwise abort the whole script
+    # under set -euo pipefail instead of just treating it as "no".
+    read -r -p "Install the Nvidia driver now? (requires a reboot afterwards) [y/N] " reply || reply=""
     if [[ "$reply" =~ ^[yY]$ ]]; then
       install_confirmed=1
     fi
@@ -177,6 +190,13 @@ configure_nvidia() {
     log_warn "Reboot the machine then re-run this script to finish the configuration."
     exit 0
   fi
+
+  # Explicit success: without it, declining the prompt above would leave the
+  # `if [ "$install_confirmed" -eq 1 ]; then ... fi` as this function's last
+  # command, and its false test's exit status would become configure_nvidia's
+  # own return code, aborting the script under `set -euo pipefail` even
+  # though declining isn't an error (caught by tests/configure_gpu_vendor.bats).
+  return 0
 }
 
 # ---------------------------------------------------------------------------
@@ -203,9 +223,31 @@ configure_intel() {
 }
 
 # ---------------------------------------------------------------------------
+# --detect-only: report distro/GPU/CPU as JSON for a caller (e.g. the Tauri
+# GUI) that wants real detection data without running any driver
+# installation. Every function called here (detect_distro, detect_all_gpus,
+# detect_cpu) is read-only — no sudo, no package install, no systemd call —
+# so this path never needs pkexec, unlike the actual GPU configuration below.
+# ---------------------------------------------------------------------------
+print_detect_json() {
+  printf '__DETECT__{"distro_pretty":"%s","gpu_vendor":"%s","gpu_name":"%s","cpu_model":"%s","cpu_threads":%s}\n' \
+    "$(json_escape "$DISTRO_PRETTY")" \
+    "$(json_escape "$GPU_VENDOR")" \
+    "$(json_escape "$GPU_NAME")" \
+    "$(json_escape "$CPU_MODEL")" \
+    "$CPU_THREADS"
+}
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 detect_all_gpus
+
+if [ "$DETECT_ONLY" -eq 1 ]; then
+  detect_cpu
+  print_detect_json
+  exit 0
+fi
 
 case "$GPU_VENDOR" in
   amd)    configure_amd ;;

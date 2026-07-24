@@ -1,0 +1,841 @@
+:root {
+  --acc: #4f46e5;
+  --acc2: #7c6ff3;
+  --acc-bg: #ecedfd;
+  --acc-ink: #3730a3;
+
+  --ink: #1e2140;
+  --ink-2: #4b4f6b;
+  --ink-3: #6a6f8c;
+  --muted: #8a8fa8;
+  --muted-2: #9195ae;
+  --muted-3: #a2a6be;
+  --faint: #b4b7c9;
+
+  --bg: #edeef6;
+  --card: #fff;
+  --card-alt: #fbfbfe;
+  --border: #eeeff6;
+  --border-2: #e7e8f1;
+  --border-3: #f0f1f6;
+
+  --ok: #10b981;
+  --ok-bg: #e8faf1;
+  --warn-ink: #b45309;
+  --warn-bg: #fef6e7;
+  --err: #e05a5a;
+
+  font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(1000px 560px at 0% -10%, #e7e9ff 0%, rgba(231, 233, 255, 0) 55%),
+    radial-gradient(900px 560px at 110% 115%, #f3e7ff 0%, rgba(243, 231, 255, 0) 55%),
+    linear-gradient(178deg, #f7f8fd 0%, #f0f1f8 100%);
+  color: var(--ink);
+}
+
+main {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 28px 24px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Stepper */
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 6px;
+  border-bottom: 1px solid var(--border-3);
+}
+
+.step {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex: 1;
+  padding: 6px 4px;
+  border: none;
+  background: none;
+  border-radius: 11px;
+  cursor: pointer;
+  font-family: inherit;
+  justify-content: center;
+  transition: opacity 0.2s;
+}
+
+.step:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.step-badge {
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border-radius: 99px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  background: var(--border-3);
+  color: var(--muted-3);
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.step.is-done .step-badge,
+.step.is-active .step-badge {
+  background: var(--acc);
+  color: #fff;
+  box-shadow: 0 6px 14px -5px var(--acc);
+}
+
+.step-label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--muted-3);
+  white-space: nowrap;
+}
+
+.step.is-done .step-label {
+  color: var(--ink-2);
+}
+
+.step.is-active .step-label {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+/* Content card */
+.content {
+  background: var(--card);
+  border-radius: 20px;
+  border: 1px solid rgba(38, 36, 92, 0.05);
+  box-shadow: 0 2px 8px -4px rgba(38, 36, 92, 0.14);
+  padding: 26px 28px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Header */
+.step-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.step-icon {
+  width: 50px;
+  height: 50px;
+  flex: none;
+  border-radius: 13px;
+  background: linear-gradient(135deg, var(--acc), #8b5cf6);
+  box-shadow: 0 12px 24px -10px rgba(79, 70, 229, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 23px;
+  color: #fff;
+}
+
+.step-header-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.step-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.step-title-row h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.step-meta {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  color: var(--acc-ink);
+  background: var(--acc-bg);
+  padding: 3px 9px;
+  border-radius: 99px;
+}
+
+.step-subtitle {
+  margin: 5px 0 0;
+  font-size: 13.5px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.config-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--ok-bg);
+  color: #047857;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 7px 12px;
+  border-radius: 99px;
+  white-space: nowrap;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* Step 1: detection rows */
+.detect-rows {
+  background: var(--card-alt);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.detect-row {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 13px 12px;
+  border-radius: 12px;
+  opacity: 0;
+  transform: translateY(12px) scale(0.97);
+  transition: opacity 0.45s cubic-bezier(0.34, 1.56, 0.64, 1), transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.detect-row.is-visible {
+  opacity: 1;
+  transform: none;
+  background: #fff;
+  box-shadow: 0 2px 8px -4px rgba(38, 36, 92, 0.14);
+}
+
+.detect-row-icon {
+  width: 38px;
+  height: 38px;
+  flex: none;
+  border-radius: 10px;
+  background: var(--acc-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+}
+
+.detect-row-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.detect-row-label {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #3a3f5c;
+}
+
+/* Stacked under the label, not a side-by-side flex column: real detected
+   strings (GPU/CPU names) are often long and would otherwise overlap a
+   fixed-width value column. */
+.detect-row-value {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--acc-ink);
+  margin-top: 2px;
+  overflow-wrap: break-word;
+}
+
+.detect-row-status {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  border-radius: 99px;
+  border: 2px solid var(--acc-bg);
+  border-top-color: var(--acc);
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.detect-result {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin-top: 14px;
+  padding: 13px 16px;
+  border-radius: 13px;
+  background: var(--acc-bg);
+  font-size: 13px;
+  color: var(--ink-2);
+  line-height: 1.5;
+}
+
+.detect-result b {
+  color: var(--ink);
+}
+
+.detect-error {
+  color: var(--err);
+  font-size: 13px;
+}
+
+/* Step 2: model cards */
+.model-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.model-card {
+  position: relative;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 15px 16px 16px;
+  box-shadow: 0 1px 3px rgba(38, 36, 92, 0.05);
+}
+
+/* Only applied on the first render of step 2 (main.js), with a per-card
+   animation-delay set inline, so re-renders triggered by toggling a
+   dropdown or the skip-models checkbox don't replay the entrance pop. */
+.model-card.is-entering {
+  animation: card-in 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes card-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.model-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.model-usage-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 4px 10px;
+  border-radius: 99px;
+}
+
+.model-usage-pill.texte {
+  background: #ecedfd;
+  color: #3730a3;
+}
+
+.model-usage-pill.code {
+  background: #f3ecfe;
+  color: #6d28d9;
+}
+
+.model-usage-pill.reflexion {
+  background: #e5f8f0;
+  color: #047857;
+}
+
+.model-usage-pill.embeddings {
+  background: #e7f0fe;
+  color: #1d4ed8;
+}
+
+.model-name {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.model-desc {
+  font-size: 12px;
+  color: var(--muted-2);
+  margin-top: 3px;
+}
+
+.model-change-btn {
+  margin-top: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--border-2);
+  background: var(--card-alt);
+  color: var(--ink-3);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 11px;
+  border-radius: 9px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.model-change-btn.is-open {
+  background: var(--acc-bg);
+  color: var(--acc-ink);
+}
+
+.model-menu {
+  position: absolute;
+  top: calc(100% - 4px);
+  left: 16px;
+  right: 16px;
+  z-index: 20;
+  background: #fff;
+  border: 1px solid var(--border-2);
+  border-radius: 12px;
+  box-shadow: 0 20px 40px -16px rgba(38, 36, 92, 0.4);
+  padding: 6px;
+  display: none;
+}
+
+.model-menu.is-open {
+  display: block;
+}
+
+.model-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  border-radius: 9px;
+  padding: 8px 10px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.model-option.is-current {
+  background: var(--acc-bg);
+}
+
+.model-option-name {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.model-option-desc {
+  font-size: 11px;
+  color: var(--muted-2);
+}
+
+.models-footer {
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--muted-3);
+  margin: 4px 0 0;
+}
+
+/* Step 3: install progress */
+.progress-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.install-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.install-pct {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--acc);
+}
+
+.progress-track {
+  height: 12px;
+  border-radius: 99px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, var(--acc), var(--acc2));
+  box-shadow: 0 0 12px -2px var(--acc);
+  transition: width 0.28s ease;
+}
+
+.install-log {
+  background: var(--card-alt);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px 16px;
+  height: 220px;
+  overflow-y: auto;
+  margin: 0;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--ink-2);
+}
+
+.log-line {
+  padding: 1px 0;
+  animation: log-in 0.32s ease both;
+}
+
+@keyframes log-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.log-line.stderr {
+  color: var(--err);
+}
+
+.log-line.meta {
+  color: var(--acc);
+  font-weight: 600;
+  margin-top: 6px;
+}
+
+/* Step 4: done */
+.done-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 4px 0 2px;
+}
+
+.done-check {
+  position: relative;
+  width: 74px;
+  height: 74px;
+  margin-bottom: 18px;
+}
+
+.done-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 99px;
+  background: var(--ok);
+  opacity: 0.18;
+  animation: ring 1.6s ease-out infinite;
+}
+
+@keyframes ring {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.5;
+  }
+  100% {
+    transform: scale(1.9);
+    opacity: 0;
+  }
+}
+
+.done-circle {
+  position: relative;
+  width: 74px;
+  height: 74px;
+  border-radius: 99px;
+  background: linear-gradient(135deg, var(--ok), #34d399);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 16px 30px -12px rgba(16, 185, 129, 0.6);
+  /* Replays automatically each time step 4 comes out of display:none. */
+  animation: pop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes pop {
+  0% {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.12);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.done-circle svg path {
+  stroke-dasharray: 40;
+  stroke-dashoffset: 40;
+  animation: draw-check 0.5s 0.25s ease forwards;
+}
+
+@keyframes draw-check {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.done-wrap h2 {
+  margin: 0;
+  font-size: 23px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.done-subtitle {
+  margin: 8px 0 0;
+  font-size: 14px;
+  color: var(--muted);
+  max-width: 440px;
+  line-height: 1.55;
+}
+
+.summary {
+  width: 100%;
+  max-width: 480px;
+  margin: 22px 0 20px;
+  background: var(--card-alt);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.summary-item {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 9px 10px;
+  text-align: left;
+}
+
+.summary-item-label {
+  flex: 1;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.summary-item-tag {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  color: var(--muted);
+  background: #f3f4fa;
+  padding: 3px 8px;
+  border-radius: 7px;
+}
+
+.btn-open-webui {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  border: none;
+  background: linear-gradient(135deg, var(--acc), #8b5cf6);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  padding: 14px 28px;
+  border-radius: 13px;
+  cursor: pointer;
+  font-family: inherit;
+  box-shadow: 0 18px 34px -14px rgba(79, 70, 229, 0.7);
+}
+
+.done-badges {
+  display: flex;
+  gap: 22px;
+  margin-top: 20px;
+  flex-wrap: wrap;
+  justify-content: center;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* Options strip */
+.options-strip {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--card-alt);
+  border: 1px solid var(--border-3);
+}
+
+.options-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--muted-3);
+  text-transform: uppercase;
+}
+
+.chk {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-3);
+  cursor: pointer;
+}
+
+.chk input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.chk-box {
+  width: 19px;
+  height: 19px;
+  flex: none;
+  border-radius: 6px;
+  border: 2px solid #d0d2e0;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.chk-box::after {
+  content: "";
+  width: 5px;
+  height: 9px;
+  border-right: 2px solid #fff;
+  border-bottom: 2px solid #fff;
+  transform: rotate(45deg) translate(-1px, -1px);
+  opacity: 0;
+}
+
+.chk input:checked + .chk-box {
+  background: var(--acc);
+  border-color: var(--acc);
+}
+
+.chk input:checked + .chk-box::after {
+  opacity: 1;
+}
+
+/* Nav row */
+.nav-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 4px;
+  border-top: 1px solid var(--border-3);
+  padding-top: 16px;
+}
+
+.btn-back,
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13.5px;
+  font-weight: 700;
+  padding: 11px 20px;
+  border-radius: 11px;
+  cursor: pointer;
+  font-family: inherit;
+  border: none;
+}
+
+.btn-back {
+  border: 1px solid var(--border-2);
+  background: #fff;
+  color: var(--ink-3);
+}
+
+.btn-primary {
+  background: var(--acc);
+  color: #fff;
+  box-shadow: 0 12px 24px -10px var(--acc);
+}
+
+.btn-primary:disabled {
+  background: var(--border-3);
+  color: var(--muted-3);
+  box-shadow: none;
+  cursor: default;
+}
+
+.dots {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 99px;
+  background: #dddee9;
+  transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.dot.is-active {
+  width: 18px;
+  background: var(--acc);
+}
+
+.dot.is-past {
+  background: var(--acc);
+}

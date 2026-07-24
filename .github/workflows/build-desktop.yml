@@ -1,0 +1,51 @@
+name: Build desktop bundles
+
+# Runs after release.yml pushes a vX.Y.Z tag (semantic-release also creates
+# the GitHub Release for that tag): builds gui/ and launcher/ for Linux
+# (.deb/.rpm/.AppImage) and Windows (.msi/.exe) and attaches the bundles to
+# that release. workflow_dispatch is available to test the build step alone
+# without waiting for a real release.
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [gui, launcher]
+        platform: [ubuntu-22.04, windows-latest]
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Linux dependencies
+        if: startsWith(matrix.platform, 'ubuntu')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libsoup-3.0-dev librsvg2-dev patchelf rpm
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "${{ matrix.app }}/src-tauri -> target"
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: ${{ matrix.app }}
+          tagName: ${{ github.ref_name }}
+          releaseName: "${{ matrix.app }} ${{ github.ref_name }}"
+          releaseBody: "Bundles for ${{ matrix.app }}. See the release notes above for what changed."
+          releaseDraft: false
+          prerelease: false

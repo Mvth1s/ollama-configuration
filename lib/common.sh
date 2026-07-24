@@ -67,6 +67,7 @@ tui_menu() {
 # ---------------------------------------------------------------------------
 load_state() {
   mkdir -p "$STATE_DIR"
+  # shellcheck source=/dev/null
   [ -f "$STATE_FILE" ] && . "$STATE_FILE"
   return 0
 }
@@ -89,13 +90,16 @@ save_state() {
 # the user installs manually, and the Ollama binary itself installs the same
 # way everywhere (official script, independent of the package manager).
 # ---------------------------------------------------------------------------
+OS_RELEASE_FILE="${OS_RELEASE_FILE:-/etc/os-release}"
+
 detect_distro() {
-  [ -n "${DISTRO_FAMILY:-}" ] && return 0
+  [ -n "${DISTRO_FAMILY:-}" ] && [ "$DISTRO_FAMILY" != "unknown" ] && return 0
   DISTRO_FAMILY="unknown"
   DISTRO_PRETTY="unknown"
 
-  if [ -f /etc/os-release ]; then
-    . /etc/os-release
+  if [ -f "$OS_RELEASE_FILE" ]; then
+    # shellcheck source=/dev/null
+    . "$OS_RELEASE_FILE"
     DISTRO_PRETTY="${PRETTY_NAME:-unknown}"
     case "${ID:-}${ID_LIKE:-}" in
       *arch*)            DISTRO_FAMILY="arch" ;;
@@ -140,4 +144,29 @@ detect_ram() {
   fi
   log_info "Detected total RAM: ${RAM_GB} GB"
   save_state RAM_GB
+}
+
+# ---------------------------------------------------------------------------
+# CPU: model name + logical thread count, for display purposes only (no
+# tier/config decision depends on this, unlike RAM/GPU).
+# ---------------------------------------------------------------------------
+detect_cpu() {
+  [ -n "${CPU_MODEL:-}" ] && return 0
+  CPU_MODEL=$(awk -F': ' '/^model name/{print $2; exit}' /proc/cpuinfo 2>/dev/null || true)
+  [ -z "$CPU_MODEL" ] && CPU_MODEL="unknown"
+  CPU_THREADS=$(nproc 2>/dev/null || echo 1)
+  log_info "Detected CPU: $CPU_MODEL ($CPU_THREADS threads)"
+  save_state CPU_MODEL CPU_THREADS
+}
+
+# ---------------------------------------------------------------------------
+# Minimal JSON string escaping (backslash and double-quote only — the values
+# passed through this ever originate from /etc/os-release, lspci, or
+# /proc/cpuinfo, none of which contain control characters in practice).
+# ---------------------------------------------------------------------------
+json_escape() {
+  local s="$1"
+  s="${s//\\/\\\\}"
+  s="${s//\"/\\\"}"
+  printf '%s' "$s"
 }

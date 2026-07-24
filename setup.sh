@@ -21,6 +21,10 @@ source lib/common.sh
 #   ./02-configure-gpu.sh
 #   ./03-pull-models.sh --tier=M
 #   ./04-install-webui.sh
+#
+# Open WebUI listens on 127.0.0.1 only by default; run
+# ./toggle-webui-lan.sh on|off|status at any time afterwards to allow/restrict
+# access from other devices on the network.
 # =============================================================================
 
 FORCE_TIER=""
@@ -34,7 +38,7 @@ for arg in "$@"; do
     --skip-models) SKIP_MODELS=1 ;;
     --skip-webui) SKIP_WEBUI=1 ;;
     --no-tui) NO_TUI_FLAG=1 ;;
-    -h|--help) sed -n '2,21p' "$0"; exit 0 ;;
+    -h|--help) sed -n '7,27p' "$0"; exit 0 ;;
     *) log_err "Unknown option: $arg"; exit 1 ;;
   esac
 done
@@ -72,10 +76,19 @@ echo " Distro       : ${DISTRO_PRETTY:-unknown} ($DISTRO_FAMILY)"
 echo " GPU          : ${GPU_NAME:-none} (${GPU_VENDOR:-none})"
 echo " RAM          : ${RAM_GB:-?} GB"
 [ "$SKIP_MODELS" -eq 0 ] && echo " Tier         : ${TIER:-?}"
-[ "$SKIP_WEBUI" -eq 0 ] && echo " Web UI       : http://localhost:8080"
+if [ "$SKIP_WEBUI" -eq 0 ]; then
+  webui_host="127.0.0.1"
+  [ -f "$STATE_DIR/webui.env" ] && webui_host="$(grep -m1 '^WEBUI_HOST=' "$STATE_DIR/webui.env" | cut -d= -f2-)"
+  if [ "$webui_host" = "0.0.0.0" ]; then
+    echo " Web UI       : http://localhost:8080 (LAN access: ON)"
+  else
+    echo " Web UI       : http://localhost:8080 (LAN access: OFF)"
+  fi
+fi
 echo "============================================================"
 echo " Useful commands:"
 echo "   ollama list                            list installed models"
 echo "   systemctl status ollama                Ollama service status"
 echo "   systemctl --user status open-webui     Open WebUI service status"
+echo "   ./toggle-webui-lan.sh on|off|status    allow/restrict LAN access to Open WebUI"
 echo "============================================================"

@@ -81,6 +81,99 @@ To start Open WebUI without an active user session:
 sudo loginctl enable-linger $USER
 ```
 
+## Windows installation
+
+A separate, native PowerShell implementation (`setup.ps1` + `lib\common.ps1`), not a port of the Bash scripts and not meant to run under WSL:
+
+```powershell
+git clone https://github.com/Mvth1s/ollama-configuration.git
+cd ollama-configuration
+.\setup.ps1
+```
+
+Options:
+
+```powershell
+.\setup.ps1                     # full install, auto-detection
+.\setup.ps1 -Tier M             # force a specific model tier (XS / S / M / L)
+.\setup.ps1 -SkipModels         # install Ollama + Open WebUI without models
+.\setup.ps1 -SkipWebui          # skip Open WebUI installation
+```
+
+Same RAM-based tier auto-selection and model tables as the table above. GPU handling is intentionally minimal: the official Ollama Windows installer already detects CUDA and ROCm natively, so the script only detects the GPU vendor (same PCI vendor IDs as the Linux scripts) to log it, and warns if an AMD GPU may fall outside ROCm's officially supported list on Windows.
+
+Open WebUI is installed via `pip`/`pipx` and run through a per-user scheduled task (`OpenWebUI`, triggered at logon) instead of a systemd service, at the same `http://localhost:8080`.
+
+```powershell
+ollama list                    # list installed models
+Get-ScheduledTask OpenWebUI    # Open WebUI task status
+```
+
+## Security note
+
+Open WebUI is installed with **no login** (`WEBUI_AUTH=False`) — anyone who can reach it can chat and manage models without authenticating. To limit the blast radius of that, it also listens on **`127.0.0.1` only by default**: nothing outside the machine itself can reach it, regardless of `WEBUI_AUTH`.
+
+If you want to reach it from another device on your network (e.g. a phone), enable LAN access at any time, on or off, without reinstalling anything:
+
+```bash
+./toggle-webui-lan.sh on       # reachable from your local network
+./toggle-webui-lan.sh off      # back to this machine only (default)
+./toggle-webui-lan.sh status   # show the current setting
+```
+
+```powershell
+.\toggle-webui-lan.ps1 on
+.\toggle-webui-lan.ps1 off
+.\toggle-webui-lan.ps1 status
+```
+
+Turning LAN access **on** prints a warning every time, because `WEBUI_AUTH` stays `False`: once reachable from the network, anyone on it can use Open WebUI, including pulling/deleting models, without logging in. If that's not acceptable for your network, enable login instead of (or in addition to) LAN access:
+
+- Linux: edit `Environment="WEBUI_AUTH=False"` to `"True"` in `~/.config/systemd/user/open-webui.service`, then `systemctl --user daemon-reload && systemctl --user restart open-webui`.
+- Windows: `[Environment]::SetEnvironmentVariable('WEBUI_AUTH', 'True', 'User')`, then restart the `OpenWebUI` scheduled task.
+- Create an account on your next visit to `http://localhost:8080` — the first account created becomes the admin.
+
+## Linting
+
+Bash scripts are checked with [ShellCheck](https://www.shellcheck.net/) on every push and pull request ([`.github/workflows/lint.yml`](.github/workflows/lint.yml)). Run the same check locally from the repo root:
+
+```bash
+shellcheck -x *.sh lib/*.sh
+```
+
+`setup.ps1`/`lib/common.ps1`/`toggle-webui-lan.ps1` are checked the same way with [PSScriptAnalyzer](https://github.com/PowerShell/PSScriptAnalyzer):
+
+```powershell
+Install-Module -Name PSScriptAnalyzer -Scope CurrentUser
+Invoke-ScriptAnalyzer -Path setup.ps1, lib/common.ps1, toggle-webui-lan.ps1
+```
+
+## Tests
+
+[`tests/`](tests/) holds a [bats](https://github.com/bats-core/bats-core) suite covering `lib/common.sh` and the tier/GPU-vendor/LAN-toggle logic in the numbered scripts. Every test runs against a throwaway `$HOME` and a stubbed `PATH` (see [`tests/test_helper.bash`](tests/test_helper.bash)), so it never touches the real package manager, systemd, or network — safe to run on your own machine, not just in CI:
+
+```bash
+bats tests/*.bats
+```
+
+`gui/` and `launcher/` each have a handful of `#[cfg(test)]` unit tests (repo-root discovery, Ollama API response mapping):
+
+```bash
+cd gui/src-tauri && cargo test       # or launcher/src-tauri
+```
+
+Both suites run on every push and pull request via [`.github/workflows/test.yml`](.github/workflows/test.yml); [`.github/workflows/rust-ci.yml`](.github/workflows/rust-ci.yml) additionally runs `cargo clippy`/`cargo build` for `gui/`/`launcher/` on every push and PR, so a broken build is no longer only caught at release time.
+
+## Desktop GUI
+
+A thin [Tauri](https://tauri.app) GUI wrapping `setup.sh`/`setup.ps1` (same options, streams the scripts' output live, plus a button to open Open WebUI in its own window) is available in [`gui/`](gui/README.md), for the one-off install.
+
+For day-to-day use afterwards, [`launcher/`](launcher/README.md) is a separate, smaller Tauri app: opens Open WebUI in its own window, and lists/pulls/deletes Ollama models directly via Ollama's local API.
+
+Packaged installers (`.deb`/`.rpm`/`.AppImage`/`.msi`/`.exe`) for both are attached to [GitHub Releases](https://github.com/Mvth1s/ollama-configuration/releases) — built and published automatically by CI on every release.
+
+A showcase site for the project (`docs/index.html`) will be deployed at **[ollama-configuration.vercel.app](https://ollama-configuration.vercel.app)** once the first release of the desktop apps is published; `vercel.json` at the repo root already points Vercel at the `docs/` folder for that deploy.
+
 ## License
 
 [MIT](LICENSE)

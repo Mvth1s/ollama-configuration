@@ -1,0 +1,73 @@
+name: Lint
+
+# Runs ShellCheck over every Bash script on each push and pull request. Run
+# the same command locally: shellcheck -x *.sh lib/*.sh (see README.md).
+# Also lints the Windows side (setup.ps1 + lib/common.ps1 + toggle-webui-lan.ps1)
+# with PSScriptAnalyzer, since ShellCheck has no PowerShell equivalent.
+on:
+  push:
+  pull_request:
+
+jobs:
+  shellcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install ShellCheck
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y shellcheck
+
+      # Cheap syntax-only pass ahead of ShellCheck's static analysis, so a
+      # plain parse error (e.g. from a bad merge) is reported unambiguously
+      # rather than buried in ShellCheck's own diagnostics.
+      - name: bash -n syntax check
+        run: |
+          for f in *.sh lib/*.sh; do
+            bash -n "$f"
+          done
+
+      - name: Run ShellCheck
+        run: shellcheck -x *.sh lib/*.sh
+
+  psscriptanalyzer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install PSScriptAnalyzer
+        shell: pwsh
+        run: Install-Module -Name PSScriptAnalyzer -Force -Scope CurrentUser -Repository PSGallery
+
+      - name: Run PSScriptAnalyzer
+        shell: pwsh
+        run: |
+          # -Path only accepts a single string, not an array, hence the loop
+          # rather than one call over the three files.
+          #
+          # Excluded rules are deliberate design choices documented in
+          # CLAUDE.md, not lint debt:
+          #   PSAvoidGlobalVars      - $Global:* is this script's state-sharing
+          #                            mechanism, the Windows counterpart to
+          #                            state.env on Linux.
+          #   PSAvoidUsingWriteHost  - Write-Host -ForegroundColor is used
+          #                            over ANSI codes for PowerShell 5.1
+          #                            console compatibility.
+          #   PSUseApprovedVerbs     - Log-Info/Log-Ok/etc. mirror lib/common.sh's
+          #                            log_info/log_ok naming on purpose.
+          #   PSReviewUnusedParameter - false positive: $Tier (the script
+          #                            param) is read inside Get-ModelTier via
+          #                            PowerShell's normal script-scope
+          #                            fallback, which this rule's static
+          #                            analysis doesn't trace across functions.
+          #   PSUseShouldProcessForStateChangingFunctions - Set-GpuConfig is
+          #                            read-only (detects and logs, does not
+          #                            mutate anything), despite the Set- verb.
+          $excluded = 'PSAvoidGlobalVars', 'PSAvoidUsingWriteHost', 'PSUseApprovedVerbs', 'PSReviewUnusedParameter', 'PSUseShouldProcessForStateChangingFunctions'
+          $files = 'setup.ps1', 'lib/common.ps1', 'toggle-webui-lan.ps1'
+          $results = $files | ForEach-Object { Invoke-ScriptAnalyzer -Path $_ -Severity Warning, Error -ExcludeRule $excluded }
+          $results | Format-Table -AutoSize
+          if ($results) {
+            throw "PSScriptAnalyzer found $($results.Count) issue(s)."
+          }
