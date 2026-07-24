@@ -132,6 +132,46 @@ mod tests {
         let ip: std::net::IpAddr = "fe80::1".parse().unwrap();
         assert_eq!(build_lan_url(ip), "http://[fe80::1]:8080");
     }
+
+    // Everything above stubs Ollama's responses with fixed JSON. This test
+    // instead exercises pull_model/list_models/delete_model against a REAL,
+    // locally running Ollama daemon and its actual HTTP API - the gap the
+    // roadmap flagged ("pull_model / delete_model jamais exercés pour de
+    // vrai contre une instance Ollama"). Ignored by default: it needs a live
+    // Ollama on 127.0.0.1:11434 and real network access to pull a model, so
+    // normal `cargo test` (CI's test.yml, on every push/PR) never runs it.
+    // Run explicitly with `cargo test -- --ignored`, which is what
+    // .github/workflows/launcher-ollama-integration.yml does (workflow_dispatch
+    // only, not on every push, since it downloads a real model). Uses
+    // "all-minilm" (~45 MB, already referenced elsewhere in this repo as a
+    // lightweight embeddings candidate) to keep the round trip fast, and
+    // deletes it again at the end regardless of the machine's prior state.
+    #[test]
+    #[ignore]
+    fn pull_list_and_delete_round_trip_against_live_ollama() {
+        const TEST_MODEL: &str = "all-minilm";
+        const TEST_MODEL_TAG: &str = "all-minilm:latest";
+
+        let mut saw_progress = false;
+        pull_model_inner(TEST_MODEL, |_progress| saw_progress = true)
+            .expect("pull_model_inner should succeed against a live Ollama");
+        assert!(saw_progress, "expected at least one progress update while pulling");
+
+        let models = list_models().expect("list_models should succeed against a live Ollama");
+        assert!(
+            models.iter().any(|m| m.name == TEST_MODEL_TAG),
+            "expected {TEST_MODEL_TAG} in list_models after pulling, got: {:?}",
+            models.iter().map(|m| &m.name).collect::<Vec<_>>()
+        );
+
+        delete_model(TEST_MODEL.to_string()).expect("delete_model should succeed against a live Ollama");
+
+        let models_after = list_models().expect("list_models should succeed after delete");
+        assert!(
+            !models_after.iter().any(|m| m.name == TEST_MODEL_TAG),
+            "expected {TEST_MODEL_TAG} to be gone from list_models after delete_model"
+        );
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -152,11 +192,12 @@ struct PullLine {
 }
 
 // Ollama's /api/pull streams one JSON object per line (NDJSON) with
-// progress updates; we forward each as a "pull-progress" event rather than
-// waiting for the whole download, the same streaming idiom used by the
-// installer GUI for child-process output.
-#[tauri::command]
-fn pull_model(app: AppHandle, model: String) -> Result<(), String> {
+// progress updates. The actual HTTP/NDJSON handling lives in
+// pull_model_inner, split out from the #[tauri::command] so it can be
+// integration-tested against a live Ollama server (see the #[ignore]d test
+// below) without needing an AppHandle, which only exists inside a running
+// Tauri app.
+fn pull_model_inner(model: &str, mut on_progress: impl FnMut(PullProgress)) -> Result<(), String> {
     let client = reqwest::blocking::Client::new();
     let resp = client
         .post(format!("{OLLAMA_URL}/api/pull"))
@@ -177,25 +218,34 @@ fn pull_model(app: AppHandle, model: String) -> Result<(), String> {
         };
 
         if let Some(err) = parsed.error {
-            let _ = app.emit(
-                "pull-progress",
-                PullProgress { model: model.clone(), status: format!("error: {err}"), completed: None, total: None },
-            );
+            on_progress(PullProgress {
+                model: model.to_string(),
+                status: format!("error: {err}"),
+                completed: None,
+                total: None,
+            });
             return Err(err);
         }
 
-        let _ = app.emit(
-            "pull-progress",
-            PullProgress {
-                model: model.clone(),
-                status: parsed.status.unwrap_or_default(),
-                completed: parsed.completed,
-                total: parsed.total,
-            },
-        );
+        on_progress(PullProgress {
+            model: model.to_string(),
+            status: parsed.status.unwrap_or_default(),
+            completed: parsed.completed,
+            total: parsed.total,
+        });
     }
 
     Ok(())
+}
+
+// Forwards each progress update as a "pull-progress" event rather than
+// waiting for the whole download, the same streaming idiom used by the
+// installer GUI for child-process output.
+#[tauri::command]
+fn pull_model(app: AppHandle, model: String) -> Result<(), String> {
+    pull_model_inner(&model, |progress| {
+        let _ = app.emit("pull-progress", progress);
+    })
 }
 
 #[tauri::command]

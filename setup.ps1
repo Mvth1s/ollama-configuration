@@ -36,11 +36,25 @@
     all read-only, same as the -DetectOnly path in 02-configure-gpu.sh and
     03-pull-models.sh on the Linux side.
 
+.PARAMETER ModelTexte
+.PARAMETER ModelCode
+.PARAMETER ModelReflexion
+.PARAMETER ModelEmbeddings
+    Override the resolved tier's default model for that usage, same
+    non-interactive mechanism as --model-<usage>= in 03-pull-models.sh. This
+    is CLI-only parity: unlike Linux, setup.ps1 has no CAND_<TIER>_<usage>
+    candidate lists or interactive picker, so there is nothing yet for a GUI
+    to offer as alternatives on Windows - these parameters exist for a
+    caller (script or human) that already knows which model tag it wants.
+
 .EXAMPLE
     .\setup.ps1
 
 .EXAMPLE
     .\setup.ps1 -Tier M -SkipWebui
+
+.EXAMPLE
+    .\setup.ps1 -ModelCode 'qwen2.5-coder:14b'
 #>
 [CmdletBinding()]
 param(
@@ -51,7 +65,15 @@ param(
 
     [switch]$SkipWebui,
 
-    [switch]$DetectOnly
+    [switch]$DetectOnly,
+
+    [string]$ModelTexte,
+
+    [string]$ModelCode,
+
+    [string]$ModelReflexion,
+
+    [string]$ModelEmbeddings
 )
 
 $ErrorActionPreference = 'Stop'
@@ -131,6 +153,22 @@ function Get-ModelTier {
 
     Log-Info "Selected model tier: $($Global:Tier)"
     Save-State -VarNames @('Tier')
+}
+
+# ---------------------------------------------------------------------------
+# Non-interactive per-usage overrides: same mutation 03-pull-models.sh's
+# --model-<usage>= flags perform on $tier_models, just sourced from
+# PowerShell parameters instead of a dialog/whiptail menu (there is no
+# TUI/candidate picker on Windows - see Get-ModelTier above and the
+# .PARAMETER doc). Called after Get-ModelTier has resolved $Global:Tier, both
+# from the -DetectOnly branch and the real run, so an override is reflected
+# in detection output too, exactly like the Linux script.
+# ---------------------------------------------------------------------------
+function Set-ModelOverride {
+    if ($ModelTexte) { $ModelTiers[$Global:Tier]['texte'] = $ModelTexte }
+    if ($ModelCode) { $ModelTiers[$Global:Tier]['code'] = $ModelCode }
+    if ($ModelReflexion) { $ModelTiers[$Global:Tier]['reflexion'] = $ModelReflexion }
+    if ($ModelEmbeddings) { $ModelTiers[$Global:Tier]['embeddings'] = $ModelEmbeddings }
 }
 
 function Install-Model {
@@ -230,6 +268,7 @@ if ($DetectOnly) {
     Get-GpuVendor | Out-Null
     Get-CpuInfo | Out-Null
     Get-ModelTier
+    Set-ModelOverride
 
     # No CAND_<TIER>_<usage> equivalent exists on Windows (no interactive
     # model picker here, by design - see Get-ModelTier/Install-Model above),
@@ -258,6 +297,7 @@ Set-GpuConfig
 
 if (-not $SkipModels) {
     Get-ModelTier
+    Set-ModelOverride
     Install-Model
 } else {
     Log-Info 'Model download skipped (-SkipModels).'

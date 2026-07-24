@@ -1,0 +1,61 @@
+name: E2E (WebDriver)
+
+# gui/dist and launcher/dist previously had no end-to-end coverage at all -
+# only pure Rust functions extracted out of their #[tauri::command]s were
+# unit-tested (see CLAUDE.md's Tests section). This drives the REAL built
+# app windows through tauri-driver/WebKitWebDriver via WebdriverIO, the same
+# way Tauri's own docs recommend:
+# https://v2.tauri.app/develop/tests/webdriver/example/webdriverio/
+#
+# Linux only for now (WebKitWebDriver has no Windows equivalent - Tauri's
+# own CI example uses msedgedriver-tool for that, out of scope here since
+# setup.ps1/the Windows side of gui/launcher aren't touched by these specs).
+on:
+  push:
+  pull_request:
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [gui, launcher]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      # webkit2gtk-driver provides WebKitWebDriver (what tauri-driver drives
+      # on Linux); xvfb provides the fake display the app runs against
+      # headless. Verified locally that these two packages alone are enough
+      # (no extra runtime deps needed beyond the WebKitGTK dev packages
+      # already installed here for the build itself).
+      - name: Install Linux WebKitGTK + WebDriver dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libsoup-3.0-dev librsvg2-dev webkit2gtk-driver xvfb
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "${{ matrix.app }}/src-tauri -> target"
+
+      - name: Install tauri-driver
+        run: cargo install tauri-driver --locked
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'npm'
+          cache-dependency-path: ${{ matrix.app }}/e2e-tests/package-lock.json
+
+      - name: npm install
+        working-directory: ${{ matrix.app }}/e2e-tests
+        run: npm install
+
+      # onPrepare in wdio.conf.js builds the app itself (plain `cargo build`,
+      # no tauri-cli/bundling involved - see gui/README.md and
+      # launcher/README.md's dev workflow), so no separate build step here.
+      - name: Run WebDriver e2e tests
+        working-directory: ${{ matrix.app }}/e2e-tests
+        run: xvfb-run --auto-servernum npm test
