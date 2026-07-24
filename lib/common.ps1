@@ -111,3 +111,20 @@ function Get-GpuVendor {
     Save-State -VarNames @('GpuVendor', 'GpuName')
     return $Global:GpuVendor
 }
+
+# ---------------------------------------------------------------------------
+# CPU: model name + logical thread count, for display purposes only (no
+# tier/config decision depends on this, unlike RAM/GPU). Windows counterpart
+# to detect_cpu in lib/common.sh.
+# ---------------------------------------------------------------------------
+function Get-CpuInfo {
+    if ($Global:CpuModel) { return $Global:CpuModel }
+
+    $cpu = Get-CimInstance Win32_Processor -ErrorAction SilentlyContinue | Select-Object -First 1
+    $Global:CpuModel = if ($cpu) { $cpu.Name.Trim() } else { 'unknown' }
+    $Global:CpuThreads = if ($cpu) { $cpu.NumberOfLogicalProcessors } else { 1 }
+
+    Log-Info "Detected CPU: $($Global:CpuModel) ($($Global:CpuThreads) threads)"
+    Save-State -VarNames @('CpuModel', 'CpuThreads')
+    return $Global:CpuModel
+}

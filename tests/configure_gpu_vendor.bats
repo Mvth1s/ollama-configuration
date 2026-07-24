@@ -109,3 +109,21 @@ echo "01:00.0 3D controller [0302]: NVIDIA Corporation GA107M [GeForce RTX 3050 
   [ "$status" -eq 0 ]
   [[ "$output" == *"Configuring Intel GPU (Vulkan, best effort)"* ]]
 }
+
+@test "--detect-only prints a __DETECT__ JSON line and never configures a driver" {
+  stub_lspci nvidia
+  run "$REPO_ROOT/02-configure-gpu.sh" --detect-only --no-tui
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'__DETECT__{"distro_pretty":'* ]]
+  [[ "$output" == *'"gpu_vendor":"nvidia"'* ]]
+  [[ "$output" != *"Configuring Nvidia GPU"* ]]
+  [[ "$output" != *"SUDO"* ]]
+}
+
+@test "--detect-only reports the CPU model and thread count" {
+  stub_lspci none
+  run "$REPO_ROOT/02-configure-gpu.sh" --detect-only --no-tui
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"cpu_model":'* ]]
+  [[ "$output" == *'"cpu_threads":'* ]]
+}

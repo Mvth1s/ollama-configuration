@@ -83,3 +83,22 @@ seed_gpu_vendor() {
   [[ "$output" != *"reduced to S"* ]]
   [[ "$output" == *"Tier manually forced: L"* ]]
 }
+
+@test "--detect-only prints tier/models/candidates as JSON and never pulls a model" {
+  stub_free_ram 8
+  stub_cmd ollama 'echo "OLLAMA $*" >> "$STUB_LOG"; exit 0'
+  run "$REPO_ROOT/03-pull-models.sh" --detect-only --tier=XS --no-tui
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'__DETECT__{"ram_gb":8,"tier":"XS"'* ]]
+  [[ "$output" == *'"tier_models":{"texte":"llama3.2:3b"'* ]]
+  [[ "$output" == *'"candidates":{"texte":['* ]]
+  [ ! -f "$STUB_LOG" ] || ! grep -q '^OLLAMA' "$STUB_LOG"
+}
+
+@test "--model-<usage>= overrides the resolved model for that usage only" {
+  stub_free_ram 8
+  run "$REPO_ROOT/03-pull-models.sh" --detect-only --tier=XS --no-tui --model-code=starcoder2:3b
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"code":"starcoder2:3b"'* ]]
+  [[ "$output" == *'"texte":"llama3.2:3b"'* ]]
+}

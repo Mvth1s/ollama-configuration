@@ -27,9 +27,11 @@ source lib/common.sh
 # Usage: ./02-configure-gpu.sh [--no-tui]
 # =============================================================================
 
+DETECT_ONLY=0
 for arg in "$@"; do
   case "$arg" in
     --no-tui) NO_TUI=1 ;;
+    --detect-only) DETECT_ONLY=1 ;;
     *) log_err "Unknown option: $arg"; exit 1 ;;
   esac
 done
@@ -221,9 +223,31 @@ configure_intel() {
 }
 
 # ---------------------------------------------------------------------------
+# --detect-only: report distro/GPU/CPU as JSON for a caller (e.g. the Tauri
+# GUI) that wants real detection data without running any driver
+# installation. Every function called here (detect_distro, detect_all_gpus,
+# detect_cpu) is read-only — no sudo, no package install, no systemd call —
+# so this path never needs pkexec, unlike the actual GPU configuration below.
+# ---------------------------------------------------------------------------
+print_detect_json() {
+  printf '__DETECT__{"distro_pretty":"%s","gpu_vendor":"%s","gpu_name":"%s","cpu_model":"%s","cpu_threads":%s}\n' \
+    "$(json_escape "$DISTRO_PRETTY")" \
+    "$(json_escape "$GPU_VENDOR")" \
+    "$(json_escape "$GPU_NAME")" \
+    "$(json_escape "$CPU_MODEL")" \
+    "$CPU_THREADS"
+}
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 detect_all_gpus
+
+if [ "$DETECT_ONLY" -eq 1 ]; then
+  detect_cpu
+  print_detect_json
+  exit 0
+fi
 
 case "$GPU_VENDOR" in
   amd)    configure_amd ;;
