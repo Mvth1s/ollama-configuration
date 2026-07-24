@@ -1,3 +1,10 @@
+## [1.0.1](https://github.com/Mvth1s/ollama-configuration/compare/v1.0.0...v1.0.1) (2026-07-24)
+
+
+### Bug Fixes
+
+* **release:** explicitly dispatch build-desktop.yml after a release ([7869d55](https://github.com/Mvth1s/ollama-configuration/commit/7869d555bca1aee219c1316564cd89eac3a05e52))
+
 # 1.0.0 (2026-07-24)
 
 
