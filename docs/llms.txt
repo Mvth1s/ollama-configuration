@@ -1,0 +1,24 @@
+# Ollama Configuration
+
+> Bash and PowerShell scripts, plus two optional Tauri desktop apps, that install and configure a local Ollama + Open WebUI stack on Linux and Windows, with automatic GPU and RAM detection.
+
+Ollama Configuration is a 100% local, no-telemetry way to set up a personal LLM inference stack: it installs Ollama, configures GPU acceleration for the detected hardware, downloads a set of models sized to the machine, and deploys Open WebUI as a local web interface. Everything runs on the user's own machine; nothing is sent to a cloud service.
+
+## Docs
+
+- [README](https://github.com/Mvth1s/ollama-configuration/blob/main/README.md): full install/usage instructions, CLI options, model tiers, GPU support matrix, and security notes.
+- [Releases](https://github.com/Mvth1s/ollama-configuration/releases): packaged desktop app installers (.deb, .rpm, .AppImage, .msi, .exe).
+- [LICENSE](https://github.com/Mvth1s/ollama-configuration/blob/main/LICENSE): MIT.
+
+## Key facts
+
+- Two independent platform implementations: numbered Bash scripts (`setup.sh` and friends) for Linux, and a native PowerShell script (`setup.ps1`) for Windows — the Windows script does not wrap or require WSL.
+- Automatic detection of GPU vendor (Nvidia, AMD, or Intel, identified by PCI ID rather than commercial card name), RAM, and Linux distribution, used to pick a model tier (XS, S, M, or L) and configure the right GPU acceleration backend: CUDA for Nvidia, ROCm/HIP for AMD (falling back to Vulkan for unsupported GPU generations), Vulkan for Intel.
+- Each model tier pulls one model per use case: general text, code, reasoning, and embeddings.
+- Deploys Open WebUI as a local web interface, bound to 127.0.0.1 by default; access from other devices on the local network is an explicit, reversible opt-in toggle (`toggle-webui-lan.sh` / `.ps1`), independent from whether a login is required.
+- Two optional desktop apps built with Tauri, both plain HTML/JS with no build step: an installer GUI (`gui/`) for the one-off setup, and a day-to-day launcher (`launcher/`) for opening Open WebUI and managing installed models afterwards.
+
+## Optional
+
+- [gui/README.md](https://github.com/Mvth1s/ollama-configuration/blob/main/gui/README.md): installer GUI details.
+- [launcher/README.md](https://github.com/Mvth1s/ollama-configuration/blob/main/launcher/README.md): launcher app details.
