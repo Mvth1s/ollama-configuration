@@ -164,7 +164,7 @@ function Get-ModelTier {
 # from the -DetectOnly branch and the real run, so an override is reflected
 # in detection output too, exactly like the Linux script.
 # ---------------------------------------------------------------------------
-function Set-ModelOverrides {
+function Set-ModelOverride {
     if ($ModelTexte) { $ModelTiers[$Global:Tier]['texte'] = $ModelTexte }
     if ($ModelCode) { $ModelTiers[$Global:Tier]['code'] = $ModelCode }
     if ($ModelReflexion) { $ModelTiers[$Global:Tier]['reflexion'] = $ModelReflexion }
@@ -268,7 +268,7 @@ if ($DetectOnly) {
     Get-GpuVendor | Out-Null
     Get-CpuInfo | Out-Null
     Get-ModelTier
-    Set-ModelOverrides
+    Set-ModelOverride
 
     # No CAND_<TIER>_<usage> equivalent exists on Windows (no interactive
     # model picker here, by design - see Get-ModelTier/Install-Model above),
@@ -297,7 +297,7 @@ Set-GpuConfig
 
 if (-not $SkipModels) {
     Get-ModelTier
-    Set-ModelOverrides
+    Set-ModelOverride
     Install-Model
 } else {
     Log-Info 'Model download skipped (-SkipModels).'
