@@ -206,6 +206,16 @@ The root `package.json` is release tooling only (commitlint, husky, semantic-rel
 - The `version` field inside `gui/src-tauri/tauri.conf.json` / `launcher/src-tauri/tauri.conf.json` is **not** automatically synced to the release tag — a deliberate simplification for now, since the two apps aren't independently versioned yet.
 - `gui/src-tauri/icons/` and `launcher/src-tauri/icons/` each hold a full icon set (`32x32.png`, `128x128.png`, `128x128@2x.png`, `icon.ico`, `icon.png`) generated with ImageMagick (`convert ... -define icon:auto-resize=... icon.ico`), required by the Windows bundler (`.ico`) and recommended for the Linux ones; both `bundle.active` are `true` with `bundle.targets: "all"` so the bundler picks whatever formats are valid for the OS it runs on.
 
+## Showcase site (`docs/`)
+
+A single self-contained `docs/index.html` (no build step, same zero-npm-dependency convention as `gui/`/`launcher/`, and the same design tokens — see [Design tokens](#design-tokens-guidiststylecss-mirrored-in-launcherdiststylecss) above) presents the project publicly. `vercel.json` (`{"outputDirectory": "docs"}`) points Vercel at that folder; the deploy to `ollama-configuration.vercel.app` is done manually by the maintainer, not via a GitHub Actions workflow, and only after the desktop apps' first release so the site can link to real packaged installers. `docs/screenshots/` holds the images it embeds (GUI detection/model steps, launcher).
+
+### SEO/GEO
+
+`docs/index.html`'s `<head>` carries Open Graph and Twitter Card meta tags, a `rel="canonical"` link, and a `SoftwareApplication` JSON-LD block; `docs/robots.txt` (allow-all, pointing at the sitemap) and `docs/sitemap.xml` (single URL, the site is one page) sit alongside it; `docs/llms.txt` follows the emerging [llms.txt](https://llmstxt.org/) convention — a plain-Markdown summary of the project (what it does, the two platform implementations, model tiers, the two desktop apps) with links to the real README/releases, aimed at LLM crawlers/GEO (generative engine optimization) rather than traditional search indexing.
+
+All of this was written and committed **before** the site's actual first deploy (the user explicitly asked for it now rather than waiting, to adjust after) — every absolute URL in these files assumes `https://ollama-configuration.vercel.app`, the domain already named elsewhere in this repo (README.md, this file) as the intended target, and `og:image`/`twitter:image`/JSON-LD `image` reuse the existing `screenshots/gui-detection.png` (948×790, not the ideal 1200×630 OG ratio) rather than a dedicated image. A comment at the top of `docs/index.html`'s `<head>` flags this explicitly. **Re-verify every one of these URLs against the real deployed domain, and consider a dedicated OG image, once the site is actually live** — the two things the roadmap had originally deferred this whole section for (Search Console submission and a real Lighthouse/Core Web Vitals check) still need a live deployment and are not done by this change.
+
 ## Conventions
 
 - Every script starts with `set -euo pipefail` and `cd "$(dirname "$0")"` (Bash) or `$ErrorActionPreference = 'Stop'` (PowerShell).
