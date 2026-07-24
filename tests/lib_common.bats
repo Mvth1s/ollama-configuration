@@ -60,6 +60,13 @@ write_os_release() {
   [ "$output" = "debian" ]
 }
 
+@test "detect_distro: retries when a stale state.env cached 'unknown'" {
+  write_os_release 'ID=arch'
+  run bash -c "source '$REPO_ROOT/lib/common.sh'; DISTRO_FAMILY=unknown; detect_distro >/dev/null; echo \"\$DISTRO_FAMILY\""
+  [ "$status" -eq 0 ]
+  [ "$output" = "arch" ]
+}
+
 @test "detect_ram: reads GB straight from 'free -g'" {
   stub_cmd free '
     if [ "$1" = "-g" ]; then printf "              total\nMem:      16\n"; fi

@@ -93,7 +93,7 @@ save_state() {
 OS_RELEASE_FILE="${OS_RELEASE_FILE:-/etc/os-release}"
 
 detect_distro() {
-  [ -n "${DISTRO_FAMILY:-}" ] && return 0
+  [ -n "${DISTRO_FAMILY:-}" ] && [ "$DISTRO_FAMILY" != "unknown" ] && return 0
   DISTRO_FAMILY="unknown"
   DISTRO_PRETTY="unknown"
 

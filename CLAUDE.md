@@ -71,7 +71,7 @@ CI (`.github/workflows/test.yml`) runs both the bats suite and `cargo test` for 
 
 All scripts source `lib/common.sh` at startup, which provides:
 - **Logging helpers**: `log_info`, `log_ok`, `log_warn`, `log_err`
-- **Distro detection**: `detect_distro` sets `DISTRO_FAMILY` (arch / debian / fedora / opensuse / unknown) by reading `/etc/os-release` fields `ID` and `ID_LIKE`
+- **Distro detection**: `detect_distro` sets `DISTRO_FAMILY` (arch / debian / fedora / opensuse / unknown) by reading `/etc/os-release` fields `ID` and `ID_LIKE`. Its already-set guard treats a cached `unknown` (e.g. from a stale `state.env`) as not set, so a machine that failed to detect once — a missing/unreadable `/etc/os-release` on that run — automatically retries on the next run instead of being stuck reporting `unknown` forever; any other cached value (a real distro family) is still trusted and skips re-detection.
 - **Package installation**: `pkg_install <pkg>…` dispatches to the right package manager for the detected distro
 - **Shared state**: `load_state` / `save_state VAR…` persist variables (GPU vendor, RAM, tier, distro) to `~/.config/ollama-stack/state.env` so later scripts can skip re-detection when chained together, but still work correctly when run standalone
 - **TUI helpers**: `tui_available` detects a usable backend (`dialog`, else `whiptail`, else none), `tui_yesno` / `tui_menu` wrap the two; `detect_tui` treats `--no-tui` (sets `NO_TUI=1`) and a non-interactive stdin/stdout as "no backend" so scripted/chained calls never block on a prompt
