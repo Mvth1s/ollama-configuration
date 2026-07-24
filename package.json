@@ -11,6 +11,6 @@
     "husky": "^9.1.6",
     "semantic-release": "^24.1.2",
     "@semantic-release/changelog": "^7.0.0",
-    "@semantic-release/git": "^10.0.1"
+    "@semantic-release/git": "^11.0.1"
   }
 }
