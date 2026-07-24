@@ -172,6 +172,8 @@ For day-to-day use afterwards, [`launcher/`](launcher/README.md) is a separate, 
 
 Packaged installers (`.deb`/`.rpm`/`.AppImage`/`.msi`/`.exe`) for both are attached to [GitHub Releases](https://github.com/Mvth1s/ollama-configuration/releases) — built and published automatically by CI on every release.
 
+A showcase site for the project (`docs/index.html`) will be deployed at **[ollama-configuration.vercel.app](https://ollama-configuration.vercel.app)** once the first release of the desktop apps is published; `vercel.json` at the repo root already points Vercel at the `docs/` folder for that deploy.
+
 ## License
 
 [MIT](LICENSE)
