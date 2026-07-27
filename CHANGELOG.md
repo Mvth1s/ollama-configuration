@@ -1,3 +1,10 @@
+## [1.1.3](https://github.com/Mvth1s/ollama-configuration/compare/v1.1.2...v1.1.3) (2026-07-27)
+
+
+### Bug Fixes
+
+* **gui:** bundle setup.sh itself, missing from the resource list ([e5cbb2c](https://github.com/Mvth1s/ollama-configuration/commit/e5cbb2cda2e253a31f925a2ae9287a478a3b8304)), closes [#49](https://github.com/Mvth1s/ollama-configuration/issues/49)
+
 ## [1.1.2](https://github.com/Mvth1s/ollama-configuration/compare/v1.1.1...v1.1.2) (2026-07-27)
 
 
