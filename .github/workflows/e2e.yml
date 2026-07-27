@@ -26,7 +26,7 @@ jobs:
       matrix:
         app: [gui, launcher]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: dtolnay/rust-toolchain@stable
 
@@ -47,7 +47,7 @@ jobs:
       - name: Install tauri-driver
         run: cargo install tauri-driver --locked
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: 'npm'
