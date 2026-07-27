@@ -52,11 +52,13 @@ jobs:
       # this only affects the ephemeral build in this job.
       - name: Sync app version to release tag
         if: inputs.release_id != ''
+        shell: bash
         run: |
           version="${{ github.ref_name }}"
           version="${version#v}"
-          jq --arg v "$version" '.version = $v' ${{ matrix.app }}/src-tauri/tauri.conf.json > /tmp/tauri.conf.json.tmp
-          mv /tmp/tauri.conf.json.tmp ${{ matrix.app }}/src-tauri/tauri.conf.json
+          conf="${{ matrix.app }}/src-tauri/tauri.conf.json"
+          jq --arg v "$version" '.version = $v' "$conf" > "$conf.tmp"
+          mv "$conf.tmp" "$conf"
 
       # releaseId (not just tagName) is what matters here: tauri-action only
       # calls the GitHub API to update an existing release's name/body when
