@@ -1,0 +1,46 @@
+name: Docs lint
+
+# docs/index.html carries real, executable JavaScript (the #download
+# section's release-asset fetch/matching logic - see CLAUDE.md's Download
+# section note), not just the inert JSON-LD <script> it had before. It's
+# never covered by ci.yml (which paths-ignores the whole docs/** folder as
+# a deliberate optimization, since the rest of docs/ is static assets that
+# have nothing to do with the Bash/Rust toolchain), and there's no
+# build/lint step for the vanilla-JS frontends anywhere else in this repo
+# either (gui/dist, launcher/dist) - their JS is only ever exercised
+# indirectly, by running the real compiled app through the WebdriverIO e2e
+# suites, which doesn't apply to a plain static HTML page. This is a
+# minimal syntax-only check to close that gap without pulling docs/ into
+# the Rust/Bash pipeline it otherwise has nothing to do with.
+#
+# Scoped to docs/index.html specifically (not all of docs/**), so a
+# screenshot/robots.txt/sitemap.xml change still doesn't trigger anything.
+on:
+  push:
+    paths:
+      - "docs/index.html"
+  pull_request:
+    paths:
+      - "docs/index.html"
+
+jobs:
+  syntax-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # docs/index.html has exactly one plain <script> (the JSON-LD block
+      # right above it uses <script type="application/ld+json">, which this
+      # line-anchored sed range deliberately does not match, since it's data
+      # rather than executable JS). Update this extraction if that script's
+      # markup ever stops being alone on its own <script>/</script> lines.
+      - name: Extract the inline script
+        run: |
+          sed -n '/^<script>$/,/^<\/script>$/p' docs/index.html | sed '1d;$d' > /tmp/docs-index-script.js
+          if [ ! -s /tmp/docs-index-script.js ]; then
+            echo "Could not extract docs/index.html's inline <script> - did its markup change shape?" >&2
+            exit 1
+          fi
+
+      - name: node --check
+        run: node --check /tmp/docs-index-script.js
