@@ -1,0 +1,57 @@
+name: CI
+
+# Single entry point for the push/pull_request pipeline: calls the fast jobs
+# (lint.yml, test.yml) first, then the two expensive ones (rust-ci.yml, a
+# full clippy+build; e2e.yml, the most expensive job in the repo) only once
+# those pass, via `needs:`. Before this, all four ran independently and in
+# parallel on every push/PR with no ordering between them, so a broken
+# shellcheck/bats run didn't stop a full Rust build+e2e suite from also
+# spending machine time on the same doomed commit.
+#
+# release.yml is folded in the same way, needing all four to succeed and
+# restricted to push-to-main: previously it ran on every push to main
+# regardless of whether lint/test/rust-ci/e2e had passed on that same push,
+# so a fix:/feat: commit that broke the build could still reach
+# semantic-release - and, in cascade, build-desktop.yml - before anyone saw
+# the test failure.
+#
+# paths-ignore skips the whole pipeline for doc-only changes (this repo's
+# own CLAUDE.md, README.md, gui/launcher README.md, docs/) - none of lint/
+# test/rust-ci/e2e touch those files, and semantic-release's own release
+# commit already carries [skip ci] so this doesn't interact with it. A push
+# mixing doc and code changes still runs everything, since the filter
+# applies to the whole push, not commit-by-commit.
+on:
+  push:
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+  pull_request:
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+
+jobs:
+  lint:
+    uses: ./.github/workflows/lint.yml
+
+  test:
+    uses: ./.github/workflows/test.yml
+
+  rust-ci:
+    needs: [lint, test]
+    uses: ./.github/workflows/rust-ci.yml
+
+  e2e:
+    needs: [lint, test]
+    uses: ./.github/workflows/e2e.yml
+
+  release:
+    needs: [lint, test, rust-ci, e2e]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    uses: ./.github/workflows/release.yml
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+      actions: write
