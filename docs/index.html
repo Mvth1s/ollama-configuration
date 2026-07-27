@@ -369,15 +369,14 @@
 <script>
 (function () {
   const APPS = [
-    { key: 'gui', prefix: 'Ollama.Stack.GUI' },
-    { key: 'launcher', prefix: 'Ollama.Launcher' }
+    { key: 'gui', prefix: 'ollama-gui-' },
+    { key: 'launcher', prefix: 'ollama-launcher-' }
   ];
-  // Extensions only, not full filenames: the Windows bundler's exact naming
-  // (msi/nsis) can't be pinned down yet since build-desktop.yml's Windows
-  // job has never actually produced a release asset (see CLAUDE.md's
-  // Releases section) - matching by app-name prefix + extension is robust
-  // to that, and to the app version in tauri.conf.json changing independently
-  // of the release tag.
+  // Extensions only, not full filenames: asset names are
+  // ollama-<app>-<version>-<platform>-<arch>.<ext> (build-desktop.yml's
+  // releaseAssetNamePattern), and the version now tracks the release tag -
+  // but matching by prefix + extension stays robust regardless, so this
+  // doesn't need updating if that ever changes again.
   const FORMATS = [
     { ext: '.deb', label: '.deb', platform: 'linux' },
     { ext: '.rpm', label: '.rpm', platform: 'linux' },

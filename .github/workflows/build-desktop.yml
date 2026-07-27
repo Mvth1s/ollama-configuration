@@ -4,12 +4,18 @@ name: Build desktop bundles
 # the GitHub Release for that tag): builds gui/ and launcher/ for Linux
 # (.deb/.rpm/.AppImage) and Windows (.msi/.exe) and attaches the bundles to
 # that release. workflow_dispatch is available to test the build step alone
-# without waiting for a real release.
+# without waiting for a real release; omit `release_id` for that (skips both
+# the version sync below and any release update, so it never touches a real
+# release's assets/metadata).
 on:
   push:
     tags:
       - "v*.*.*"
   workflow_dispatch:
+    inputs:
+      release_id:
+        description: "GitHub release ID to attach assets to (from release.yml). Leave empty for a manual test build that doesn't touch any real release."
+        required: false
 
 permissions:
   contents: write
@@ -39,13 +45,44 @@ jobs:
         with:
           workspaces: "${{ matrix.app }}/src-tauri -> target"
 
+      # gui/launcher's tauri.conf.json `version` is otherwise independent of
+      # the release tag (see CLAUDE.md) - stamp the tag's version into this
+      # job's own checkout before building, so packaged installers carry the
+      # same version as the release they're attached to. Not committed back:
+      # this only affects the ephemeral build in this job.
+      - name: Sync app version to release tag
+        if: inputs.release_id != ''
+        run: |
+          version="${{ github.ref_name }}"
+          version="${version#v}"
+          jq --arg v "$version" '.version = $v' ${{ matrix.app }}/src-tauri/tauri.conf.json > /tmp/tauri.conf.json.tmp
+          mv /tmp/tauri.conf.json.tmp ${{ matrix.app }}/src-tauri/tauri.conf.json
+
+      # releaseId (not just tagName) is what matters here: tauri-action only
+      # calls the GitHub API to update an existing release's name/body when
+      # it has to look the release up *by tag* - passing releaseId directly
+      # skips that lookup/update entirely. Previously all 4 matrix jobs
+      # shared one release (by tag) and each overwrote its name/body with
+      # matrix.app-specific text, so whichever job finished last clobbered
+      # semantic-release's actual generated release notes (found on v1.1.0:
+      # the release name/body ended up as literally "gui v1.1.0" / "Bundles
+      # for gui..."). releaseName/releaseBody below are only a fallback for
+      # a manual test dispatch with no release_id (or the tag-push trigger
+      # above, dormant per release.yml's own note on GITHUB_TOKEN and
+      # push-event recursion) - the real flow never reaches them.
+      #
+      # releaseAssetNamePattern gives every format (.deb/.rpm/.AppImage/
+      # .msi/.exe) the same structure instead of each bundler's own default
+      # naming convention: ollama-<app>-<version>-<platform>-<arch>.<ext>.
       - uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           projectPath: ${{ matrix.app }}
           tagName: ${{ github.ref_name }}
-          releaseName: "${{ matrix.app }} ${{ github.ref_name }}"
-          releaseBody: "Bundles for ${{ matrix.app }}. See the release notes above for what changed."
+          releaseId: ${{ inputs.release_id }}
+          releaseName: "Ollama Configuration ${{ github.ref_name }}"
+          releaseBody: "See the release notes above for what changed."
           releaseDraft: false
           prerelease: false
+          releaseAssetNamePattern: "ollama-${{ matrix.app }}-[version]-[platform]-[arch][ext]"
