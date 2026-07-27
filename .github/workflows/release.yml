@@ -33,9 +33,18 @@ jobs:
         with:
           fetch-depth: 0
 
+      # semantic-release 25.x and @semantic-release/git 11.x both declare
+      # engines requiring Node >=22 - a real requirement, not just a stale
+      # warning: reproduced locally in Docker that `npm ci` against this
+      # repo's committed package-lock.json fails under Node 20 *and* Node
+      # 22 with "Missing: conventional-commits-filter@6.0.1 from lock
+      # file", and only succeeds cleanly under Node 24 (matching e2e.yml's
+      # existing node-version). This broke the first real push-to-main
+      # release after the semantic-release/git dependency bump, since this
+      # was still pinned to 20 at the time.
       - uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 24
 
       - name: Install release tooling
         run: npm ci
