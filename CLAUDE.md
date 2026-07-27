@@ -210,7 +210,7 @@ The root `package.json` is release tooling only (commitlint, husky, semantic-rel
 
 ## Showcase site (`docs/`)
 
-A single self-contained `docs/index.html` (no build step, same zero-npm-dependency convention as `gui/`/`launcher/`, and the same design tokens — see [Design tokens](#design-tokens-guidiststylecss-mirrored-in-launcherdiststylecss) above) presents the project publicly. `vercel.json` (`{"outputDirectory": "docs"}`) points Vercel at that folder; the deploy to `ollama-configuration.vercel.app` is done manually by the maintainer, not via a GitHub Actions workflow, and only after the desktop apps' first release so the site can link to real packaged installers. `docs/screenshots/` holds the images it embeds (GUI detection/model steps, launcher).
+A single self-contained `docs/index.html` (no build step, same zero-npm-dependency convention as `gui/`/`launcher/`, and the same design tokens — see [Design tokens](#design-tokens-guidiststylecss-mirrored-in-launcherdiststylecss) above) presents the project publicly. `vercel.json` (`{"outputDirectory": "docs"}`) points Vercel at that folder; deploys are automatic via Vercel's own Git integration (not a GitHub Actions workflow) — every push gets its own preview deployment, and the production domain (`ollama-configuration.vercel.app`) updates as soon as a change lands on `main`. `docs/screenshots/` holds the images it embeds (GUI detection/model steps, launcher).
 
 ### Download section
 
