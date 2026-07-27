@@ -8,9 +8,13 @@ name: Rust CI
 # clippy runs with -D warnings: the gui/launcher baseline was confirmed clean
 # (zero clippy warnings) by PR #13's CI run on 2026-07-22, so any new warning
 # now fails the job instead of accumulating as unaudited lint debt.
+#
+# Called from ci.yml (workflow_call), gated on lint.yml/test.yml succeeding
+# first since this is one of the two expensive jobs (full compile, twice);
+# workflow_dispatch kept for a standalone manual run.
 on:
-  push:
-  pull_request:
+  workflow_call:
+  workflow_dispatch:
 
 jobs:
   clippy-and-build:

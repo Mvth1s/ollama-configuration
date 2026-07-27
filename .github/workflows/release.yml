@@ -7,10 +7,17 @@ name: Release
 # release (v1.0.0: tag and GitHub Release were created, but zero installer
 # assets were attached). Explicitly dispatching it below is the fix:
 # workflow_dispatch is expressly exempted from that restriction.
+#
+# Called from ci.yml (workflow_call), gated on lint/test/rust-ci/e2e all
+# succeeding first and restricted to push-to-main there - this is what
+# stops a broken commit from reaching semantic-release (and, in cascade,
+# build-desktop.yml) before its own tests have even run. workflow_dispatch
+# kept for a standalone manual run (semantic-release itself still refuses
+# to release from a branch outside .releaserc.json's `branches`, so this
+# is safe to trigger from elsewhere - it just fails loudly instead).
 on:
-  push:
-    branches:
-      - main
+  workflow_call:
+  workflow_dispatch:
 
 permissions:
   contents: write

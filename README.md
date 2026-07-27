@@ -1,14 +1,39 @@
 # ollama-configuration
 
-Bash scripts to install and configure a local [Ollama](https://ollama.com) stack on Linux, with automatic GPU and RAM detection. Installs Ollama, configures GPU acceleration, downloads a set of models suited to the machine, and deploys [Open WebUI](https://github.com/open-webui/open-webui) as a web interface.
+Run your own private AI assistant, entirely on your own computer — no subscription, no cloud, no data ever leaving your machine. This project installs and configures everything for you: [Ollama](https://ollama.com) to run the AI models, and [Open WebUI](https://github.com/open-webui/open-webui) as a ChatGPT-style chat interface, with models automatically chosen to fit your computer's hardware.
 
-## Requirements
+It works on both Linux and Windows, either through a graphical installer (no terminal needed) or a set of scripts for those who prefer the command line.
+
+## Screenshots
+
+<table>
+<tr>
+<td width="50%"><img src="docs/screenshots/gui-detection.png" alt="Installer assistant detecting the computer's GPU, CPU, RAM and distribution" width="100%"/><br/><sub><b>Installer assistant</b> — detects your GPU, CPU, RAM and picks a model tier automatically.</sub></td>
+<td width="50%"><img src="docs/screenshots/gui-models.png" alt="Installer assistant, model selection step" width="100%"/><br/><sub><b>Model selection</b> — one model per use case (text, code, reasoning, embeddings), auto-picked, changeable.</sub></td>
+</tr>
+<tr>
+<td colspan="2"><img src="docs/screenshots/launcher.png" alt="Ollama Launcher managing the Open WebUI service and network access" width="100%"/><br/><sub><b>Launcher</b> — day-to-day companion app: start/stop Open WebUI, manage installed models, share network access via a QR code.</sub></td>
+</tr>
+</table>
+
+## Get started
+
+The simplest way to get started is the desktop app: download the installer for your platform, run it, and it walks you through detecting your hardware and picking models — no terminal required.
+
+- **[Download the installer](https://github.com/Mvth1s/ollama-configuration/releases)** for your platform and format (`.deb`/`.rpm`/`.AppImage` on Linux, `.msi`/`.exe` on Windows), or browse them visually on the **[showcase site](https://ollama-configuration.vercel.app/#download)**.
+- Once installed, [`launcher/`](launcher/README.md) (Ollama Launcher) is the app you'll actually use day-to-day afterwards: open the chat interface, start/stop the service, manage models, and share access on your local network.
+
+Prefer the command line, or want more control over each step? See [Quick start (command line)](#quick-start-command-line) below — everything the desktop app does is just a thin wrapper around the same scripts.
+
+More detail on both apps: [`gui/README.md`](gui/README.md) (installer) and [`launcher/README.md`](launcher/README.md) (day-to-day companion).
+
+## Quick start (command line)
+
+### Requirements
 
 - Linux (Arch, Debian/Ubuntu, Fedora, openSUSE — other distros require manual GPU driver installation)
 - `curl`, `bash` ≥ 4.0 (for associative arrays)
 - `sudo` privileges for package installation and systemd configuration
-
-## Quick start
 
 ```bash
 git clone https://github.com/Mvth1s/ollama-configuration.git
@@ -47,7 +72,7 @@ Each script can be re-run on its own without reinstalling everything:
 
 ## Model tiers
 
-The tier is chosen automatically based on available RAM and can be overridden with `--tier=`.
+The tier is chosen automatically based on available RAM — you don't need to pick one yourself; the table below is just for reference, or to override it with `--tier=`.
 
 | Tier | RAM | Text | Code | Reasoning | Embeddings |
 |------|-----|------|------|-----------|------------|
@@ -59,6 +84,8 @@ The tier is chosen automatically based on available RAM and can be overridden wi
 On CPU-only machines (no dedicated GPU), the tier is capped at S regardless of RAM.
 
 ## GPU support
+
+Also automatic — detected and configured for you. Reference table:
 
 | Vendor | Backend | Notes |
 |--------|---------|-------|
@@ -133,9 +160,19 @@ Turning LAN access **on** prints a warning every time, because `WEBUI_AUTH` stay
 - Windows: `[Environment]::SetEnvironmentVariable('WEBUI_AUTH', 'True', 'User')`, then restart the `OpenWebUI` scheduled task.
 - Create an account on your next visit to `http://localhost:8080` — the first account created becomes the admin.
 
-## Linting
+## Desktop apps and showcase site
 
-Bash scripts are checked with [ShellCheck](https://www.shellcheck.net/) on every push and pull request ([`.github/workflows/lint.yml`](.github/workflows/lint.yml)). Run the same check locally from the repo root:
+Packaged installers (`.deb`/`.rpm`/`.AppImage`/`.msi`/`.exe`) for both `gui/` and `launcher/` are attached to [GitHub Releases](https://github.com/Mvth1s/ollama-configuration/releases) — built and published automatically by CI on every release.
+
+A showcase site for the project (`docs/index.html`) is live at **[ollama-configuration.vercel.app](https://ollama-configuration.vercel.app)**, with a `#download` section linking directly to the latest release's installer files per app/platform/format; `vercel.json` at the repo root points Vercel at the `docs/` folder. Deploys are automatic via Vercel's own Git integration (no GitHub Actions workflow involved): every push gets a preview deployment, and the production domain updates as soon as a change lands on `main`.
+
+## Contributing
+
+The sections below are for contributors working on this repo itself — skip them if you're just installing and using the project.
+
+### Linting
+
+Bash scripts are checked with [ShellCheck](https://www.shellcheck.net/) ([`.github/workflows/lint.yml`](.github/workflows/lint.yml)). Run the same check locally from the repo root:
 
 ```bash
 shellcheck -x *.sh lib/*.sh
@@ -148,7 +185,7 @@ Install-Module -Name PSScriptAnalyzer -Scope CurrentUser
 Invoke-ScriptAnalyzer -Path setup.ps1, lib/common.ps1, toggle-webui-lan.ps1
 ```
 
-## Tests
+### Tests
 
 [`tests/`](tests/) holds a [bats](https://github.com/bats-core/bats-core) suite covering `lib/common.sh` and the tier/GPU-vendor/LAN-toggle logic in the numbered scripts. Every test runs against a throwaway `$HOME` and a stubbed `PATH` (see [`tests/test_helper.bash`](tests/test_helper.bash)), so it never touches the real package manager, systemd, or network — safe to run on your own machine, not just in CI:
 
@@ -162,17 +199,9 @@ bats tests/*.bats
 cd gui/src-tauri && cargo test       # or launcher/src-tauri
 ```
 
-Both suites run on every push and pull request via [`.github/workflows/test.yml`](.github/workflows/test.yml); [`.github/workflows/rust-ci.yml`](.github/workflows/rust-ci.yml) additionally runs `cargo clippy`/`cargo build` for `gui/`/`launcher/` on every push and PR, so a broken build is no longer only caught at release time.
+Both suites run via [`.github/workflows/test.yml`](.github/workflows/test.yml); [`.github/workflows/rust-ci.yml`](.github/workflows/rust-ci.yml) additionally runs `cargo clippy`/`cargo build` for `gui/`/`launcher/`, and [`.github/workflows/e2e.yml`](.github/workflows/e2e.yml) drives the real compiled app windows through WebdriverIO — so a broken build or a UI regression is no longer only caught at release time.
 
-## Desktop GUI
-
-A thin [Tauri](https://tauri.app) GUI wrapping `setup.sh`/`setup.ps1` (same options, streams the scripts' output live, plus a button to open Open WebUI in its own window) is available in [`gui/`](gui/README.md), for the one-off install.
-
-For day-to-day use afterwards, [`launcher/`](launcher/README.md) is a separate, smaller Tauri app: opens Open WebUI in its own window, and lists/pulls/deletes Ollama models directly via Ollama's local API.
-
-Packaged installers (`.deb`/`.rpm`/`.AppImage`/`.msi`/`.exe`) for both are attached to [GitHub Releases](https://github.com/Mvth1s/ollama-configuration/releases) — built and published automatically by CI on every release.
-
-A showcase site for the project (`docs/index.html`) will be deployed at **[ollama-configuration.vercel.app](https://ollama-configuration.vercel.app)** once the first release of the desktop apps is published; `vercel.json` at the repo root already points Vercel at the `docs/` folder for that deploy.
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) is the single entry point for all of the above on every push and pull request: it runs `lint`+`test` first, then `rust-ci`+`e2e` only once those pass, so a broken shellcheck/bats run doesn't waste time on a full Tauri build. It skips entirely on doc-only changes (`**/*.md`, `docs/**`); [`.github/workflows/docs-lint.yml`](.github/workflows/docs-lint.yml) separately runs a syntax check on `docs/index.html`'s own inline script, since that one file has real JS despite living under `docs/`.
 
 ## License
 

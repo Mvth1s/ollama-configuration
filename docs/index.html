@@ -155,6 +155,31 @@
   .card h3 { font-size: 16px; margin: 0 0 8px; font-weight: 700; }
   .card p { margin: 0; font-size: 13.5px; color: var(--ink-3); line-height: 1.55; }
 
+  section.downloads { padding: 0 0 56px; }
+  .dl-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; }
+  .dl-card {
+    background: #fff; border: 1px solid var(--border); border-radius: 16px; padding: 22px;
+    box-shadow: 0 2px 8px -4px rgba(38,36,92,.1);
+  }
+  .dl-card-head { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
+  .dl-card-head .ic {
+    flex: none; width: 42px; height: 42px; border-radius: 11px; display: flex; align-items: center;
+    justify-content: center; font-size: 20px; background: var(--acc-bg);
+  }
+  .dl-card-head h3 { margin: 0 0 2px; font-size: 16px; font-weight: 700; }
+  .dl-card-head p { margin: 0; font-size: 13px; color: var(--ink-3); }
+  .dl-platform { margin-top: 14px; }
+  .dl-platform-label { display: block; font-size: 12.5px; font-weight: 700; color: var(--ink-2); margin-bottom: 8px; }
+  .dl-formats { display: flex; gap: 8px; flex-wrap: wrap; }
+  .dl-btn {
+    display: inline-flex; align-items: center; font-family: 'JetBrains Mono', monospace;
+    font-size: 12.5px; font-weight: 600; padding: 7px 12px; border-radius: 9px;
+    text-decoration: none; background: var(--ok-bg); color: #067a55; border: 1px solid transparent;
+  }
+  .dl-btn:hover { border-color: #067a55; }
+  .dl-btn-pending { background: #f3f4f8; color: var(--muted-2); cursor: default; }
+  .dl-fallback { text-align: center; font-size: 13px; color: var(--ink-3); margin-top: 20px; }
+
   .platforms { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; padding-bottom: 56px; }
   .platform-chip {
     display: flex; align-items: center; gap: 10px; background: #fff; border: 1px solid var(--border-2);
@@ -171,6 +196,7 @@
     .hero h1 { font-size: 32px; }
     .shot-row { grid-template-columns: 1fr; }
     .grid { grid-template-columns: 1fr; }
+    .dl-grid { grid-template-columns: 1fr; }
     .nav-links { display: none; }
   }
 
@@ -191,8 +217,9 @@
     <nav class="nav-links">
       <a href="#screenshots">Aperçu</a>
       <a href="#features">Fonctionnalités</a>
+      <a href="#download">Téléchargements</a>
       <a href="#install">Installation</a>
-      <a href="https://github.com/Mvth1s/ollama-configuration">GitHub</a>
+      <a href="https://github.com/Mvth1s/ollama-configuration" target="_blank" rel="noopener noreferrer">GitHub</a>
     </nav>
   </header>
 
@@ -201,8 +228,8 @@
     <h1>Ton IA locale, <span>configurée en une commande</span>.</h1>
     <p class="lead">Installe Ollama, configure l'accélération GPU, télécharge des modèles adaptés à ta machine, et déploie Open&nbsp;WebUI — sur Linux ou Windows, avec ou sans interface graphique.</p>
     <div class="cta-row">
-      <a class="btn btn-primary" href="https://github.com/Mvth1s/ollama-configuration">Voir sur GitHub</a>
-      <a class="btn btn-secondary" href="https://github.com/Mvth1s/ollama-configuration/releases">Télécharger les apps de bureau</a>
+      <a class="btn btn-primary" href="https://github.com/Mvth1s/ollama-configuration" target="_blank" rel="noopener noreferrer">Voir sur GitHub</a>
+      <a class="btn btn-secondary" href="#download">Télécharger les apps de bureau</a>
     </div>
     <div class="install-box">
       <div class="l">git clone https://github.com/Mvth1s/ollama-configuration.git</div>
@@ -273,6 +300,53 @@
     </div>
   </section>
 
+  <section class="downloads" id="download">
+    <div class="section-head">
+      <h2>Télécharge les apps de bureau</h2>
+      <p>Liens construits en direct depuis les fichiers attachés à la dernière release GitHub — jamais de version périmée.</p>
+    </div>
+    <div class="dl-grid">
+      <div class="dl-card" data-app="gui">
+        <div class="dl-card-head">
+          <div class="ic">🎛️</div>
+          <div>
+            <h3>Ollama Stack GUI</h3>
+            <p>Assistant d'installation, une seule fois.</p>
+          </div>
+        </div>
+        <div class="dl-platform">
+          <span class="dl-platform-label">🐧 Linux</span>
+          <div class="dl-formats" data-platform="linux"></div>
+        </div>
+        <div class="dl-platform">
+          <span class="dl-platform-label">🪟 Windows</span>
+          <div class="dl-formats" data-platform="windows"></div>
+        </div>
+      </div>
+      <div class="dl-card" data-app="launcher">
+        <div class="dl-card-head">
+          <div class="ic">🚀</div>
+          <div>
+            <h3>Ollama Launcher</h3>
+            <p>Usage quotidien : Open WebUI et les modèles.</p>
+          </div>
+        </div>
+        <div class="dl-platform">
+          <span class="dl-platform-label">🐧 Linux</span>
+          <div class="dl-formats" data-platform="linux"></div>
+        </div>
+        <div class="dl-platform">
+          <span class="dl-platform-label">🪟 Windows</span>
+          <div class="dl-formats" data-platform="windows"></div>
+        </div>
+      </div>
+    </div>
+    <p class="dl-fallback" id="dl-fallback" hidden>
+      Impossible de récupérer la dernière release depuis l'API GitHub —
+      <a href="https://github.com/Mvth1s/ollama-configuration/releases" target="_blank" rel="noopener noreferrer">voir toutes les releases sur GitHub</a>.
+    </p>
+  </section>
+
   <div class="platforms" id="install">
     <div class="platform-chip">🐧 Linux — Arch / Debian / Ubuntu / Fedora / openSUSE</div>
     <div class="platform-chip">🪟 Windows — PowerShell 5.1+</div>
@@ -282,15 +356,86 @@
     <div class="foot-row">
       <span>MIT © Mvth1s</span>
       <span>
-        <a href="https://github.com/Mvth1s/ollama-configuration">Dépôt GitHub</a>
+        <a href="https://github.com/Mvth1s/ollama-configuration" target="_blank" rel="noopener noreferrer">Dépôt GitHub</a>
         &nbsp;·&nbsp;
-        <a href="https://github.com/Mvth1s/ollama-configuration/blob/main/README.md">Documentation</a>
+        <a href="https://github.com/Mvth1s/ollama-configuration/blob/main/README.md" target="_blank" rel="noopener noreferrer">Documentation</a>
         &nbsp;·&nbsp;
-        <a href="https://github.com/Mvth1s/ollama-configuration/releases">Releases</a>
+        <a href="https://github.com/Mvth1s/ollama-configuration/releases" target="_blank" rel="noopener noreferrer">Releases</a>
       </span>
     </div>
   </footer>
 </div>
+
+<script>
+(function () {
+  const APPS = [
+    { key: 'gui', prefix: 'Ollama.Stack.GUI' },
+    { key: 'launcher', prefix: 'Ollama.Launcher' }
+  ];
+  // Extensions only, not full filenames: the Windows bundler's exact naming
+  // (msi/nsis) can't be pinned down yet since build-desktop.yml's Windows
+  // job has never actually produced a release asset (see CLAUDE.md's
+  // Releases section) - matching by app-name prefix + extension is robust
+  // to that, and to the app version in tauri.conf.json changing independently
+  // of the release tag.
+  const FORMATS = [
+    { ext: '.deb', label: '.deb', platform: 'linux' },
+    { ext: '.rpm', label: '.rpm', platform: 'linux' },
+    { ext: '.AppImage', label: '.AppImage', platform: 'linux' },
+    { ext: '.msi', label: '.msi', platform: 'windows' },
+    { ext: '.exe', label: '.exe', platform: 'windows' }
+  ];
+
+  function findAsset(assets, app, format) {
+    return assets.find((asset) =>
+      asset.name.startsWith(app.prefix) &&
+      asset.name.toLowerCase().endsWith(format.ext.toLowerCase())
+    );
+  }
+
+  function downloadButton(format, url) {
+    const a = document.createElement('a');
+    a.className = 'dl-btn';
+    a.href = url;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    a.textContent = format.label;
+    return a;
+  }
+
+  function pendingButton(format) {
+    const span = document.createElement('span');
+    span.className = 'dl-btn dl-btn-pending';
+    span.textContent = format.label + ' · bientôt';
+    span.title = "Pas encore disponible dans la dernière release";
+    return span;
+  }
+
+  function render(assets) {
+    APPS.forEach((app) => {
+      const card = document.querySelector(`.dl-card[data-app="${app.key}"]`);
+      if (!card) return;
+      FORMATS.forEach((format) => {
+        const container = card.querySelector(`.dl-formats[data-platform="${format.platform}"]`);
+        if (!container) return;
+        const asset = findAsset(assets, app, format);
+        container.appendChild(asset ? downloadButton(format, asset.browser_download_url) : pendingButton(format));
+      });
+    });
+  }
+
+  fetch('https://api.github.com/repos/Mvth1s/ollama-configuration/releases/latest')
+    .then((res) => {
+      if (!res.ok) throw new Error(`GitHub API error ${res.status}`);
+      return res.json();
+    })
+    .then((data) => render(data.assets || []))
+    .catch(() => {
+      const fallback = document.getElementById('dl-fallback');
+      if (fallback) fallback.hidden = false;
+    });
+})();
+</script>
 
 </body>
 </html>
