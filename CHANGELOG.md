@@ -1,3 +1,11 @@
+## [1.1.1](https://github.com/Mvth1s/ollama-configuration/compare/v1.1.0...v1.1.1) (2026-07-27)
+
+
+### Bug Fixes
+
+* **gui:** bundle the install scripts as Tauri resources ([f684143](https://github.com/Mvth1s/ollama-configuration/commit/f684143818de9384f3fd4edd37bd4e88285e46b3))
+* **release:** stop clobbering release notes, unify asset names, sync app version ([e6b63d0](https://github.com/Mvth1s/ollama-configuration/commit/e6b63d0b4a40fd896fef53b16c05639c6efe8187))
+
 # [1.1.0](https://github.com/Mvth1s/ollama-configuration/compare/v1.0.1...v1.1.0) (2026-07-27)
 
 
