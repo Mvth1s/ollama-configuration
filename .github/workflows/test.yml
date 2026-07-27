@@ -5,9 +5,12 @@ name: Test
 # gui/src-tauri and launcher/src-tauri. All bats tests run against a
 # throwaway $HOME and a stubbed PATH (see tests/test_helper.bash) so nothing
 # here ever touches the runner's real package manager, systemd, or network.
+#
+# Called from ci.yml (workflow_call) as one of the fast jobs that gate
+# rust-ci.yml/e2e.yml; workflow_dispatch kept for a standalone manual run.
 on:
-  push:
-  pull_request:
+  workflow_call:
+  workflow_dispatch:
 
 jobs:
   bats:

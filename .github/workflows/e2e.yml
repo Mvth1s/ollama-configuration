@@ -10,9 +10,13 @@ name: E2E (WebDriver)
 # Linux only for now (WebKitWebDriver has no Windows equivalent - Tauri's
 # own CI example uses msedgedriver-tool for that, out of scope here since
 # setup.ps1/the Windows side of gui/launcher aren't touched by these specs).
+#
+# Called from ci.yml (workflow_call), gated on lint.yml/test.yml succeeding
+# first since this is the single most expensive job in the pipeline;
+# workflow_dispatch kept for a standalone manual run.
 on:
-  push:
-  pull_request:
+  workflow_call:
+  workflow_dispatch:
 
 jobs:
   e2e:

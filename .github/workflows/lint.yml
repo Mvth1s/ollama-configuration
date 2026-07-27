@@ -1,12 +1,15 @@
 name: Lint
 
-# Runs ShellCheck over every Bash script on each push and pull request. Run
-# the same command locally: shellcheck -x *.sh lib/*.sh (see README.md).
-# Also lints the Windows side (setup.ps1 + lib/common.ps1 + toggle-webui-lan.ps1)
-# with PSScriptAnalyzer, since ShellCheck has no PowerShell equivalent.
+# Runs ShellCheck over every Bash script. Run the same command locally:
+# shellcheck -x *.sh lib/*.sh (see README.md). Also lints the Windows side
+# (setup.ps1 + lib/common.ps1 + toggle-webui-lan.ps1) with PSScriptAnalyzer,
+# since ShellCheck has no PowerShell equivalent.
+#
+# Called from ci.yml (workflow_call) as one of the fast jobs that gate
+# rust-ci.yml/e2e.yml; workflow_dispatch kept for a standalone manual run.
 on:
-  push:
-  pull_request:
+  workflow_call:
+  workflow_dispatch:
 
 jobs:
   shellcheck:
