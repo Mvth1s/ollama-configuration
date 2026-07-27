@@ -1,3 +1,10 @@
+## [1.1.2](https://github.com/Mvth1s/ollama-configuration/compare/v1.1.1...v1.1.2) (2026-07-27)
+
+
+### Bug Fixes
+
+* **release:** run the version-sync step under bash on windows-latest too ([a987b30](https://github.com/Mvth1s/ollama-configuration/commit/a987b30d06c22a9ca3b865a1eb73b4f13cf75856)), closes [#48](https://github.com/Mvth1s/ollama-configuration/issues/48)
+
 ## [1.1.1](https://github.com/Mvth1s/ollama-configuration/compare/v1.1.0...v1.1.1) (2026-07-27)
 
 
