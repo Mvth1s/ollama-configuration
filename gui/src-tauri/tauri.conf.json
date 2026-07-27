@@ -35,6 +35,7 @@
       "icons/icon.png"
     ],
     "resources": {
+      "../../setup.sh": "scripts/setup.sh",
       "../../01-install-ollama.sh": "scripts/01-install-ollama.sh",
       "../../02-configure-gpu.sh": "scripts/02-configure-gpu.sh",
       "../../03-pull-models.sh": "scripts/03-pull-models.sh",
