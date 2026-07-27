@@ -1,3 +1,16 @@
+# [1.1.0](https://github.com/Mvth1s/ollama-configuration/compare/v1.0.1...v1.1.0) (2026-07-27)
+
+
+### Bug Fixes
+
+* **gui,launcher:** re-encode icon PNGs as 8-bit to fix the Windows build ([4a20b8a](https://github.com/Mvth1s/ollama-configuration/commit/4a20b8aee9202bf0c368f2da63e3c4bc2524538e))
+* **release:** bump release.yml to Node 24, sync dev's package.json/lock ([f973fb9](https://github.com/Mvth1s/ollama-configuration/commit/f973fb90aaad4e7a4683904e75de5c3d7ff3e976)), closes [#45](https://github.com/Mvth1s/ollama-configuration/issues/45) [#39](https://github.com/Mvth1s/ollama-configuration/issues/39)
+
+
+### Features
+
+* **docs:** add a direct-download section to the showcase site ([b136b98](https://github.com/Mvth1s/ollama-configuration/commit/b136b9853732cfb791f66dc0151cb70bb16abfcd)), closes [#download](https://github.com/Mvth1s/ollama-configuration/issues/download)
+
 ## [1.0.1](https://github.com/Mvth1s/ollama-configuration/compare/v1.0.0...v1.0.1) (2026-07-24)
 
 
