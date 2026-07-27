@@ -135,7 +135,7 @@ Turning LAN access **on** prints a warning every time, because `WEBUI_AUTH` stay
 
 ## Linting
 
-Bash scripts are checked with [ShellCheck](https://www.shellcheck.net/) on every push and pull request ([`.github/workflows/lint.yml`](.github/workflows/lint.yml)). Run the same check locally from the repo root:
+Bash scripts are checked with [ShellCheck](https://www.shellcheck.net/) ([`.github/workflows/lint.yml`](.github/workflows/lint.yml)). Run the same check locally from the repo root:
 
 ```bash
 shellcheck -x *.sh lib/*.sh
@@ -162,7 +162,9 @@ bats tests/*.bats
 cd gui/src-tauri && cargo test       # or launcher/src-tauri
 ```
 
-Both suites run on every push and pull request via [`.github/workflows/test.yml`](.github/workflows/test.yml); [`.github/workflows/rust-ci.yml`](.github/workflows/rust-ci.yml) additionally runs `cargo clippy`/`cargo build` for `gui/`/`launcher/` on every push and PR, so a broken build is no longer only caught at release time.
+Both suites run via [`.github/workflows/test.yml`](.github/workflows/test.yml); [`.github/workflows/rust-ci.yml`](.github/workflows/rust-ci.yml) additionally runs `cargo clippy`/`cargo build` for `gui/`/`launcher/`, and [`.github/workflows/e2e.yml`](.github/workflows/e2e.yml) drives the real compiled app windows through WebdriverIO — so a broken build or a UI regression is no longer only caught at release time.
+
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) is the single entry point for all of the above on every push and pull request: it runs `lint`+`test` first, then `rust-ci`+`e2e` only once those pass, so a broken shellcheck/bats run doesn't waste time on a full Tauri build. It skips entirely on doc-only changes (`**/*.md`, `docs/**`); [`.github/workflows/docs-lint.yml`](.github/workflows/docs-lint.yml) separately runs a syntax check on `docs/index.html`'s own inline script, since that one file has real JS despite living under `docs/`.
 
 ## Desktop GUI
 
@@ -172,7 +174,7 @@ For day-to-day use afterwards, [`launcher/`](launcher/README.md) is a separate, 
 
 Packaged installers (`.deb`/`.rpm`/`.AppImage`/`.msi`/`.exe`) for both are attached to [GitHub Releases](https://github.com/Mvth1s/ollama-configuration/releases) — built and published automatically by CI on every release.
 
-A showcase site for the project (`docs/index.html`) will be deployed at **[ollama-configuration.vercel.app](https://ollama-configuration.vercel.app)** once the first release of the desktop apps is published; `vercel.json` at the repo root already points Vercel at the `docs/` folder for that deploy.
+A showcase site for the project (`docs/index.html`) is live at **[ollama-configuration.vercel.app](https://ollama-configuration.vercel.app)**, with a `#download` section linking directly to the latest release's installer files per app/platform/format; `vercel.json` at the repo root points Vercel at the `docs/` folder. Deploys are triggered manually by the maintainer, not by a GitHub Actions workflow, so the live site can lag behind `main` until the next manual redeploy.
 
 ## License
 
