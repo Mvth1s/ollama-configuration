@@ -33,6 +33,15 @@
       "icons/128x128@2x.png",
       "icons/icon.ico",
       "icons/icon.png"
-    ]
+    ],
+    "resources": {
+      "../../01-install-ollama.sh": "scripts/01-install-ollama.sh",
+      "../../02-configure-gpu.sh": "scripts/02-configure-gpu.sh",
+      "../../03-pull-models.sh": "scripts/03-pull-models.sh",
+      "../../04-install-webui.sh": "scripts/04-install-webui.sh",
+      "../../lib/common.sh": "scripts/lib/common.sh",
+      "../../setup.ps1": "scripts/setup.ps1",
+      "../../lib/common.ps1": "scripts/lib/common.ps1"
+    }
   }
 }

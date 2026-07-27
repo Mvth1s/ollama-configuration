@@ -59,8 +59,16 @@ jobs:
       # this repo used directly before, just exposing its outcome as step
       # outputs (new_release_published, new_release_git_tag) - config is
       # unchanged, still driven entirely by .releaserc.json/package.json.
+      #
+      # Looks up the release's numeric ID and passes it through as
+      # build-desktop.yml's `release_id` input, rather than just the tag:
+      # tauri-action needs the ID directly to attach assets without also
+      # overwriting the release's name/body (see build-desktop.yml's own
+      # comment on that bug).
       - name: Trigger desktop bundle build
         if: steps.semantic.outputs.new_release_published == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh workflow run build-desktop.yml --ref "${{ steps.semantic.outputs.new_release_git_tag }}"
+        run: |
+          release_id=$(gh api "repos/${{ github.repository }}/releases/tags/${{ steps.semantic.outputs.new_release_git_tag }}" --jq .id)
+          gh workflow run build-desktop.yml --ref "${{ steps.semantic.outputs.new_release_git_tag }}" -f release_id="$release_id"

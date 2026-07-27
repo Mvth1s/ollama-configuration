@@ -179,8 +179,8 @@ fn detect_windows(repo_root: &Path, tier: &Option<String>) -> Result<DetectResul
 }
 
 #[tauri::command]
-fn detect_system(options: DetectOptions) -> Result<DetectResult, String> {
-    let repo_root = find_repo_root()?;
+fn detect_system(app: AppHandle, options: DetectOptions) -> Result<DetectResult, String> {
+    let repo_root = find_scripts_dir(&app)?;
     #[cfg(target_os = "windows")]
     return detect_windows(&repo_root, &options.tier);
     #[cfg(not(target_os = "windows"))]
@@ -215,10 +215,36 @@ struct InstallDone {
     message: String,
 }
 
+// A packaged install (.deb/.rpm/.AppImage/.msi/.exe, downloaded from GitHub
+// Releases) has no repo checkout anywhere near it - it never did, despite
+// find_repo_root's old doc comment calling that "a future bundled app placed
+// at the repo root". A real user hitting this got a bare "could not locate
+// setup.sh in any parent directory of the running executable" with no repo
+// in sight to place it next to. The actual fix is bundling the scripts as
+// Tauri resources (tauri.conf.json's bundle.resources, both .sh and .ps1
+// variants copied into every platform's package - simpler than juggling
+// per-platform resource lists, and a few KB of unused-on-that-OS scripts
+// costs nothing that matters), and resolving them from the app's resource
+// directory at runtime. find_repo_root() is kept as the fallback for
+// `cargo run`/`cargo build` from within a repo checkout during development,
+// where resources aren't necessarily copied next to the debug binary.
+fn find_scripts_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    let marker_name = if cfg!(target_os = "windows") { "setup.ps1" } else { "setup.sh" };
+
+    if let Ok(resource_dir) = app.path().resource_dir() {
+        let candidate = resource_dir.join("scripts");
+        if candidate.join(marker_name).is_file() {
+            return Ok(candidate);
+        }
+    }
+
+    find_repo_root()
+}
+
 // Walks up from the running executable's directory looking for setup.sh
-// (Linux) / setup.ps1 (Windows), so both `cargo run` (target/debug/ nested
-// a few levels under gui/) and a future bundled app placed at the repo root
-// resolve the scripts the same way.
+// (Linux) / setup.ps1 (Windows) - a repo checkout's root, for `cargo run`/
+// `cargo build` during development. Not meant for a packaged install; see
+// find_scripts_dir above.
 fn find_repo_root() -> Result<PathBuf, String> {
     let start =
         std::env::current_exe().map_err(|e| format!("cannot resolve current executable path: {e}"))?;
@@ -508,8 +534,8 @@ fn run_windows(app: &AppHandle, repo_root: &Path, opts: &InstallOptions) -> Resu
 
 #[tauri::command]
 fn run_install(app: AppHandle, options: InstallOptions) -> Result<InstallDone, String> {
-    let repo_root = find_repo_root()?;
-    emit_log(&app, "meta", format!("Repository root: {}", repo_root.display()));
+    let repo_root = find_scripts_dir(&app)?;
+    emit_log(&app, "meta", format!("Scripts directory: {}", repo_root.display()));
 
     #[cfg(target_os = "windows")]
     let result = run_windows(&app, &repo_root, &options);

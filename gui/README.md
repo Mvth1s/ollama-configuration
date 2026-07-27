@@ -6,7 +6,7 @@ A [Tauri](https://tauri.app) desktop GUI over `setup.sh` / `setup.ps1`, presente
 
 - `src-tauri/` — Rust backend (`src/main.rs`). No JS framework, no npm dependency for the frontend: `dist/` is plain HTML/CSS/JS served directly by Tauri (`app.withGlobalTauri = true` in `tauri.conf.json` exposes `window.__TAURI__` without an `@tauri-apps/api` import).
 - `dist/` — the frontend: `index.html`, `main.js`, `style.css`.
-- At startup, the backend walks up from the running executable's directory looking for `setup.sh` (Linux) / `setup.ps1` (Windows), so it finds the scripts whether run via `cargo run` (nested under `gui/src-tauri/target/...`) or as a standalone binary placed at the repository root.
+- At startup, the backend looks for the numbered scripts/`setup.ps1` in its own bundled Tauri resources first (`app.path().resource_dir().join("scripts")` — see the repo-root `CLAUDE.md`), which is what a real packaged install (`.deb`/`.rpm`/`.AppImage`/`.msi`/`.exe`) uses. It falls back to walking up from the running executable's directory looking for `setup.sh`/`setup.ps1` directly, for `cargo run`/`cargo build` from within a repo checkout during development.
 
 ### Wizard steps
 
