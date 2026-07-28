@@ -1,0 +1,80 @@
+# Maintainer: Mvth1s
+pkgname=ollama-stack-gui
+pkgver=1.1.4
+pkgrel=1
+pkgdesc="Installer GUI for the ollama-configuration stack (Ollama + Open WebUI)"
+arch=('x86_64')
+url="https://github.com/Mvth1s/ollama-configuration"
+license=('MIT')
+depends=('webkit2gtk-4.1' 'gtk3')
+makedepends=('rust')
+source=("$pkgname-$pkgver.tar.gz::https://github.com/Mvth1s/ollama-configuration/archive/refs/tags/v$pkgver.tar.gz")
+sha256sums=('681730cc95b67d2ae1abfa133768bb448517be85495a85c262e1295ab8b4260a')
+
+# No tauri-cli / `cargo tauri build` involved: asset embedding happens at
+# compile time via src-tauri/build.rs (tauri_build::build()) regardless of
+# how cargo is invoked, and both apps' dist/ is plain checked-in HTML/JS with
+# no frontend build step - so a plain `cargo build --release` already
+# produces a fully working binary, exactly like `gui/README.md`'s own
+# documented dev workflow (`cargo run`/`cargo build` from src-tauri/).
+build() {
+  cd "ollama-configuration-$pkgver/gui/src-tauri"
+  cargo build --release --locked
+}
+
+check() {
+  cd "ollama-configuration-$pkgver/gui/src-tauri"
+  cargo test --release --locked
+}
+
+package() {
+  cd "ollama-configuration-$pkgver"
+
+  install -Dm755 "gui/src-tauri/target/release/ollama-stack-gui" \
+    "$pkgdir/usr/bin/ollama-stack-gui"
+
+  # This app locates the numbered install scripts via Tauri's resource_dir()
+  # first (tauri-utils' resource_dir_from(), Linux branch: it resolves to
+  # <exe_dir>/../lib/<productName> - i.e. /usr/lib/Ollama Stack GUI here,
+  # since our binary lives in /usr/bin - falling back to
+  # /usr/lib/<productName> directly if that canonicalize fails), the same
+  # layout `cargo tauri build`'s .deb/.rpm bundler already produces from
+  # tauri.conf.json's bundle.resources (confirmed by inspecting a real
+  # released .deb with dpkg-deb -c). "Ollama Stack GUI" (with the literal
+  # spaces) comes straight from productName in gui/src-tauri/tauri.conf.json,
+  # not the crate/binary name - see tauri-codegen's context.rs, PackageInfo
+  # is built from config.product_name when set. This directory MUST keep
+  # that exact name for find_scripts_dir() in gui/src-tauri/src/main.rs to
+  # find it; if productName is ever renamed, update this path too.
+  local resdir="$pkgdir/usr/lib/Ollama Stack GUI/scripts"
+  install -Dm755 setup.sh "$resdir/setup.sh"
+  install -Dm755 01-install-ollama.sh "$resdir/01-install-ollama.sh"
+  install -Dm755 02-configure-gpu.sh "$resdir/02-configure-gpu.sh"
+  install -Dm755 03-pull-models.sh "$resdir/03-pull-models.sh"
+  install -Dm755 04-install-webui.sh "$resdir/04-install-webui.sh"
+  install -Dm644 lib/common.sh "$resdir/lib/common.sh"
+  install -Dm644 setup.ps1 "$resdir/setup.ps1"
+  install -Dm644 lib/common.ps1 "$resdir/lib/common.ps1"
+
+  # 128x128@2x.png is a real 256x256 PNG (macOS/Tauri @2x naming, not a
+  # literal hicolor size), so it belongs under hicolor's 256x256 tier.
+  install -Dm644 "gui/src-tauri/icons/32x32.png" \
+    "$pkgdir/usr/share/icons/hicolor/32x32/apps/$pkgname.png"
+  install -Dm644 "gui/src-tauri/icons/128x128.png" \
+    "$pkgdir/usr/share/icons/hicolor/128x128/apps/$pkgname.png"
+  install -Dm644 "gui/src-tauri/icons/128x128@2x.png" \
+    "$pkgdir/usr/share/icons/hicolor/256x256/apps/$pkgname.png"
+
+  install -Dm644 /dev/stdin "$pkgdir/usr/share/applications/$pkgname.desktop" <<-EOF
+	[Desktop Entry]
+	Type=Application
+	Name=Ollama Stack GUI
+	Comment=$pkgdesc
+	Exec=ollama-stack-gui
+	Icon=$pkgname
+	Categories=Utility;
+	Terminal=false
+	EOF
+
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}
