@@ -34,40 +34,28 @@ in `check()`, and installs the binary, a `.desktop` entry, and hicolor icons.
 
 ## How this was verified
 
-Neither `PKGBUILD` was run through a real `makepkg` — the environment this was prepared
-in has no `pacman`/Arch toolchain available. Instead, every step `makepkg` would perform
-was reproduced manually and confirmed to work:
+Both `PKGBUILD`s have been run through a real `makepkg -s` inside an actual Arch Linux
+environment (the official `archlinux:base-devel` container image, with a throwaway
+unprivileged `builder` user created for the run — `makepkg` refuses to run as root): full
+`build()` (`cargo build --release --locked`), `check()` (`cargo test --release --locked`),
+and `package()` all completed successfully for both apps, producing a real
+`.pkg.tar.zst`. For `gui` (the one with scripts to bundle), the resulting package's file
+tree was inspected directly and confirmed correct: `/usr/bin/ollama-stack-gui` alongside
+`/usr/lib/Ollama Stack GUI/scripts/` (all four numbered scripts, `lib/common.sh`,
+`setup.ps1`, `lib/common.ps1`), the `.desktop` entry, and hicolor icons at all three
+sizes — exactly the layout `find_scripts_dir()` in `gui/src-tauri/src/main.rs` looks for.
+`.github/workflows/arch-package.yml` re-runs this exact `makepkg -s` check in CI (matrix
+over `gui`/`launcher`) whenever either `PKGBUILD` changes, so this stays verified going
+forward instead of being a one-off manual check.
 
-- Downloaded the real `v1.1.4` release tarball from GitHub and computed its `sha256sum`
-  (the value baked into both `PKGBUILD`s) — confirmed it extracts to
-  `ollama-configuration-1.1.4/` with `gui/src-tauri/`, `launcher/src-tauri/`, the four
-  numbered scripts, `lib/common.sh`, `setup.ps1`, `lib/common.ps1`, and `LICENSE` all
-  present at the expected paths.
-- Ran `cargo build --release --locked` for both `gui/src-tauri` and `launcher/src-tauri`
-  from that pristine tarball extract (i.e. not the existing repo checkout's own
-  `target/`) — both compiled cleanly end to end.
-- Ran `cargo test --release --locked` for both — all tests pass (`gui`: 6/6; `launcher`:
-  6/6 plus the one `#[ignore]`d live-Ollama integration test, correctly skipped by
-  default).
-- Ran `ldd` against both resulting binaries — no unresolved shared libraries (this
-  sandbox's `webkit2gtk-4.1`/`gtk3` dev packages happen to be close enough to Arch's own
-  to confirm dynamic linking works the same way, though the actual runtime `depends=()`
-  package names are Arch's, confirmed against the real Arch package database via
-  `archlinux.org`'s package search API rather than guessed).
-- Manually replicated every `install -D...` line from both `package()` functions against
-  a throwaway fake root and confirmed the resulting file tree, `.desktop` file contents,
-  and — for `gui`, the one with scripts to bundle — that the installed layout
-  (`/usr/bin/ollama-stack-gui` + `/usr/lib/Ollama Stack GUI/scripts/...`) matches exactly
-  what Tauri's own `resource_dir()` resolves to at runtime for a binary installed at
-  `/usr/bin` (`tauri-utils`' `resource_dir_from()`, read directly from the Tauri v2.9.3
-  source): `<exe_dir>/../lib/<productName>`, where `productName` ("Ollama Stack GUI",
-  with the literal space) comes from `gui/src-tauri/tauri.conf.json`, not the crate name.
-  This is the same resource lookup `find_scripts_dir()` in `gui/src-tauri/src/main.rs`
-  already uses for the `.deb`/`.rpm` bundles — this `PKGBUILD` reproduces that exact
-  layout by hand instead of changing any app code.
+One non-fatal `makepkg` warning showed up for both packages and is expected, not a bug:
+`WARNING: Package contains reference to $srcdir` on the built binary — Rust embeds
+compile-time (including panic-location) paths in binaries by default, which is common for
+Rust-based AUR packages and not something this `PKGBUILD` attempts to suppress.
 
-Not yet run through a real `makepkg -si`/`pacman -U` — do that on your own Arch machine
-to confirm before relying on this.
+Still only checked inside a container, not installed for real via `pacman -U` on a
+physical/VM Arch desktop (polkit/session/GPU behavior can't be verified from a headless
+container) — that last step is on whoever installs this for real.
 
 ## Keeping this up to date
 
