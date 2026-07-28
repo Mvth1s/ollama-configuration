@@ -1,0 +1,58 @@
+name: Arch package (PKGBUILD)
+
+# Validates packaging/arch/gui/PKGBUILD and packaging/arch/launcher/PKGBUILD
+# by actually running `makepkg` inside a real Arch Linux container
+# (archlinux:base-devel) - the one thing that could not be verified when
+# these PKGBUILDs were first added (no Arch machine was available at the
+# time; see CLAUDE.md's Arch Linux packaging section).
+#
+# Each PKGBUILD builds from a pinned release tag's source tarball (not this
+# checkout's own working tree - see packaging/arch/README.md), so this only
+# needs to re-run when the PKGBUILDs themselves change (a pkgver/sha256sums
+# bump, a dependency tweak, ...), not on every unrelated commit. Scoped
+# directly to packaging/arch/** rather than routed through ci.yml, the same
+# "standalone, path-scoped" shape docs-lint.yml already uses for a similarly
+# narrow, unrelated-to-the-rest-of-CI concern.
+on:
+  push:
+    paths:
+      - "packaging/arch/**"
+  pull_request:
+    paths:
+      - "packaging/arch/**"
+  workflow_dispatch:
+
+jobs:
+  makepkg:
+    runs-on: ubuntu-latest
+    container: archlinux:base-devel
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [gui, launcher]
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install build dependencies
+        run: pacman -Syu --noconfirm --needed rust webkit2gtk-4.1 gtk3 sudo git
+
+      # makepkg refuses outright to run as root (by design - a malicious
+      # PKGBUILD could otherwise do anything as root during build()/
+      # package()), but archlinux:base-devel's only user is root. A
+      # throwaway "builder" user, with passwordless sudo so `makepkg -s` can
+      # pacman -S its own declared depends/makedepends, is the standard way
+      # around this in a container - not needed on a real desktop install,
+      # where the user is already unprivileged.
+      - name: Create a non-root build user
+        run: |
+          useradd -m builder
+          echo "builder ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/builder
+          chown -R builder:builder "$GITHUB_WORKSPACE"
+
+      - name: makepkg -s
+        working-directory: packaging/arch/${{ matrix.app }}
+        run: su builder -c "cd '$PWD' && makepkg -s --noconfirm"
+
+      - name: Verify a package was actually produced
+        working-directory: packaging/arch/${{ matrix.app }}
+        run: ls -- *.pkg.tar.zst

@@ -222,11 +222,14 @@ from `tauri.conf.json`'s `bundle.resources` (Tauri's `resource_dir()` resolves t
 without this, `find_scripts_dir()` in `gui/src-tauri/src/main.rs` would fail to find the
 scripts and hit the same `could not locate setup.sh` error already fixed once for the
 `.deb` bundle. `launcher/`'s `PKGBUILD` has no such resource step: it never touches
-`setup.sh`/`setup.ps1` at all. This was verified by building both apps from a pristine copy
-of the real `v1.1.4` release tarball with plain `cargo build --release --locked`/`cargo
-test --release --locked` (both pass) and manually replicating every `package()` install
-step against a throwaway root; a real `makepkg -si`/`pacman -U` run is still needed to
-fully confirm — see `packaging/arch/README.md`.
+`setup.sh`/`setup.ps1` at all. Both `PKGBUILD`s have since been run through a real
+`makepkg -s` inside an `archlinux:base-devel` container (build/check/package all succeed;
+`gui`'s resulting package's file tree was inspected directly and matches the layout
+above) — see `packaging/arch/README.md` for the one non-fatal `makepkg` warning this
+produces and what's still only verified in a container rather than a real desktop install.
+`.github/workflows/arch-package.yml` re-runs this same `makepkg -s` check in CI (matrix
+over `gui`/`launcher`, in the official Arch container image) whenever either `PKGBUILD`
+changes, so it doesn't silently bit-rot as dependencies move in Arch's own repos.
 
 ## Releases
 
