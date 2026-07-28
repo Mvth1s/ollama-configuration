@@ -8,7 +8,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::io::{BufRead, BufReader};
+use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
@@ -353,10 +353,137 @@ mod tests {
         assert_eq!(result.tier_models["texte"], "llama3.1:8b");
         assert_eq!(result.candidates["texte"][0].model, "llama3.1:8b");
     }
+
+    fn collect_lines(input: &[u8]) -> Vec<String> {
+        let mut lines = Vec::new();
+        stream_ansi_aware(std::io::Cursor::new(input), |line| lines.push(line));
+        lines
+    }
+
+    #[test]
+    fn passes_plain_newline_delimited_text_through_unchanged() {
+        assert_eq!(collect_lines(b"line one\nline two\n"), vec!["line one", "line two"]);
+    }
+
+    #[test]
+    fn flushes_a_trailing_line_with_no_terminator_at_eof() {
+        assert_eq!(collect_lines(b"line one\nno newline at the end"), vec!["line one", "no newline at the end"]);
+    }
+
+    #[test]
+    fn treats_bare_carriage_return_as_a_line_boundary() {
+        assert_eq!(collect_lines(b"downloading 10%\rdownloading 20%\r"), vec!["downloading 10%", "downloading 20%"]);
+    }
+
+    #[test]
+    fn treats_cursor_to_column_1_as_a_line_boundary() {
+        // The exact pattern `ollama pull` was captured emitting for every
+        // progress redraw: ESC [ 1 G to return to column 1.
+        let input = b"downloading 10%\x1b[1Gdownloading 20%\x1b[1G";
+        assert_eq!(collect_lines(input), vec!["downloading 10%", "downloading 20%"]);
+    }
+
+    #[test]
+    fn drops_other_csi_sequences_without_flushing_a_line() {
+        // ESC [ K (erase to end of line) and ESC [ ? 25 l (hide cursor), as
+        // seen surrounding ollama's real progress redraws, should vanish
+        // from the output rather than showing up as literal escape codes
+        // or splitting a single line into extra empty ones.
+        let input = b"pulling manifest\x1b[K\x1b[?25l done\n";
+        assert_eq!(collect_lines(input), vec!["pulling manifest done"]);
+    }
+
+    #[test]
+    fn preserves_a_byte_following_a_lone_escape_not_starting_a_csi_sequence() {
+        let input = b"before\x1bxafter\n";
+        assert_eq!(collect_lines(input), vec!["beforexafter"]);
+    }
 }
 
 fn emit_log(app: &AppHandle, stream: &str, text: String) {
     let _ = app.emit("install-log", LogLine { stream: stream.into(), text });
+}
+
+// `ollama pull` (invoked by 03-pull-models.sh) renders its progress with
+// ANSI cursor-control sequences - `ESC [ 1 G` (cursor to column 1) and
+// `ESC [ K` (erase to end of line) to redraw the same spot - rather than
+// ever printing a `\n` while a download is in progress (confirmed by
+// capturing its raw piped output: a full pull produced only a handful of
+// real newlines, all the percentage/size updates in between were `ESC [ 1 G`
+// redraws). Plain line-based reading (`BufRead::lines()`, which only splits
+// on `\n`) would therefore buffer an entire model download silently and
+// only flush it once a real newline eventually appeared - which is exactly
+// what made the GUI look stuck at 0% during a model pull even though it was
+// working. This reads raw bytes and treats a bare `\r` and "cursor to
+// column 1" (`ESC [ <n> G`) as line boundaries too, so live progress
+// updates stream to the frontend log pane the same way they'd render in a
+// real terminal. Other recognized CSI sequences (cursor show/hide,
+// erase-line, synchronized-update markers, ...) are dropped rather than
+// shown as literal escape codes; anything not starting a CSI sequence is
+// passed through unchanged.
+fn stream_ansi_aware<R: Read>(reader: R, mut on_line: impl FnMut(String)) {
+    enum State {
+        Normal,
+        Esc,
+        Csi,
+    }
+
+    let mut state = State::Normal;
+    let mut line: Vec<u8> = Vec::new();
+    let mut reader = BufReader::new(reader);
+    let mut byte = [0u8; 1];
+
+    loop {
+        match reader.read(&mut byte) {
+            Ok(0) | Err(_) => break,
+            Ok(_) => {}
+        }
+        let b = byte[0];
+
+        match state {
+            State::Normal => match b {
+                b'\n' | b'\r' => {
+                    on_line(String::from_utf8_lossy(&line).into_owned());
+                    line.clear();
+                }
+                0x1B => state = State::Esc,
+                _ => line.push(b),
+            },
+            State::Esc => {
+                if b == b'[' {
+                    state = State::Csi;
+                } else {
+                    // Not a CSI sequence after all: re-dispatch this byte
+                    // as if it had been read in Normal state, rather than
+                    // silently dropping it.
+                    state = State::Normal;
+                    match b {
+                        b'\n' | b'\r' => {
+                            on_line(String::from_utf8_lossy(&line).into_owned());
+                            line.clear();
+                        }
+                        0x1B => state = State::Esc,
+                        _ => line.push(b),
+                    }
+                }
+            }
+            State::Csi => {
+                // Final byte of a CSI sequence: any of 0x40..=0x7E: RFC-ish
+                // ANSI/ECMA-48 convention, params are digits/';'/'?' before it.
+                if (0x40..=0x7E).contains(&b) {
+                    if b == b'G' {
+                        on_line(String::from_utf8_lossy(&line).into_owned());
+                        line.clear();
+                    }
+                    state = State::Normal;
+                }
+            }
+        }
+    }
+
+    if !line.is_empty() {
+        on_line(String::from_utf8_lossy(&line).into_owned());
+    }
 }
 
 fn stream_child(app: &AppHandle, mut child: std::process::Child) -> Result<bool, String> {
@@ -366,18 +493,14 @@ fn stream_child(app: &AppHandle, mut child: std::process::Child) -> Result<bool,
     let app_out = app.clone();
     let out_handle = stdout.map(|s| {
         std::thread::spawn(move || {
-            for line in BufReader::new(s).lines().map_while(Result::ok) {
-                emit_log(&app_out, "stdout", line);
-            }
+            stream_ansi_aware(s, |line| emit_log(&app_out, "stdout", line));
         })
     });
 
     let app_err = app.clone();
     let err_handle = stderr.map(|s| {
         std::thread::spawn(move || {
-            for line in BufReader::new(s).lines().map_while(Result::ok) {
-                emit_log(&app_err, "stderr", line);
-            }
+            stream_ansi_aware(s, |line| emit_log(&app_err, "stderr", line));
         })
     });
 
