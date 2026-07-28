@@ -431,6 +431,12 @@ fn run_linux(app: &AppHandle, repo_root: &Path, opts: &InstallOptions) -> Result
     // skipped steps) before anything actually starts.
     emit_step(app, "ollama", "Installing Ollama", "pending");
     emit_step(app, "gpu", "Configuring GPU", "pending");
+    emit_step(
+        app,
+        "webui-deps",
+        "Installing Open WebUI prerequisites",
+        if opts.skip_webui { "skipped" } else { "pending" },
+    );
     emit_step(app, "models", "Downloading models", if opts.skip_models { "skipped" } else { "pending" });
     emit_step(app, "webui", "Installing Open WebUI", if opts.skip_webui { "skipped" } else { "pending" });
 
@@ -454,6 +460,29 @@ fn run_linux(app: &AppHandle, repo_root: &Path, opts: &InstallOptions) -> Result
         let ok = run_step(app, id, label, cmd)?;
         if !ok {
             return Err(format!("{label} failed, see the log above."));
+        }
+    }
+
+    // 04-install-webui.sh's own pkg_install call (python3/pip/pipx) always
+    // shells out to `sudo`, which hangs forever under this step's
+    // deliberately-unprivileged, no-controlling-terminal invocation (sudo's
+    // auth cache is separate from pkexec's, so authenticating for 01/02
+    // above does not cover this). Installing those prerequisites here, via
+    // pkexec like 01/02, means 04's own run finds pipx already present and
+    // never needs to call sudo at all - see 04-install-webui.sh's
+    // install_webui_deps for the matching idempotency check.
+    if !opts.skip_webui {
+        emit_log(
+            app,
+            "meta",
+            "This step needs administrator privileges — you may be prompted for your password.".into(),
+        );
+        let mut cmd = Command::new("pkexec");
+        cmd.current_dir(repo_root).arg(repo_root.join("04-install-webui.sh")).arg("--install-deps");
+        detach_from_tty(&mut cmd);
+        let ok = run_step(app, "webui-deps", "Installing Open WebUI prerequisites", cmd)?;
+        if !ok {
+            return Err("Installing Open WebUI prerequisites failed, see the log above.".into());
         }
     }
 
