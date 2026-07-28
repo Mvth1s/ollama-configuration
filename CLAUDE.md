@@ -221,8 +221,8 @@ scripts and hit the same `could not locate setup.sh` error already fixed once fo
 `setup.sh`/`setup.ps1` at all. This was verified by building both apps from a pristine copy
 of the real `v1.1.4` release tarball with plain `cargo build --release --locked`/`cargo
 test --release --locked` (both pass) and manually replicating every `package()` install
-step against a throwaway root — not by a real `makepkg` run, since no Arch machine was
-available; see the "Not verified" list in `packaging/arch/README.md`.
+step against a throwaway root; a real `makepkg -si`/`pacman -U` run is still needed to
+fully confirm — see `packaging/arch/README.md`.
 
 ## Releases
 

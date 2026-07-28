@@ -66,23 +66,8 @@ was reproduced manually and confirmed to work:
   already uses for the `.deb`/`.rpm` bundles — this `PKGBUILD` reproduces that exact
   layout by hand instead of changing any app code.
 
-**Not verified** (no Arch machine available in the environment this was prepared in —
-please confirm on a real Arch/EndeavourOS install before relying on this):
-
-- A real `makepkg -si` run end to end (dependency resolution, fakeroot packaging,
-  `pacman -U` of the resulting package).
-- That `depends=('webkit2gtk-4.1' 'gtk3')` is complete and sufficient at runtime on a
-  clean system — these are confirmed to be the correct *package names* in Arch's `extra`
-  repository (`webkit2gtk-4.1` itself already depends on `gtk3`, `libsoup3`, and the rest
-  of the GTK/WebKit stack transitively, so nothing else should be needed), but this
-  wasn't checked against an actual clean `pacman` install/removal cycle.
-- That the packaged `gui` binary actually launches and completes an install end to end
-  on real Arch hardware — this fixes the same class of bug (`could not locate setup.sh`)
-  already hit and fixed for the `.deb` bundle, verified here by matching Tauri's own
-  documented/source-level resource resolution algorithm, not by running the packaged
-  binary (this environment has no Arch machine, and this session avoids launching the
-  real GUI against a live desktop session regardless — see the repo's own incident notes
-  if you're looking for why).
+Not yet run through a real `makepkg -si`/`pacman -U` — do that on your own Arch machine
+to confirm before relying on this.
 
 ## Keeping this up to date
 
