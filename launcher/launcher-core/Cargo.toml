@@ -1,0 +1,12 @@
+[package]
+name = "launcher-core"
+version = "0.1.0"
+description = "Pure, tauri-free logic for launcher/ - kept as its own crate so its unit tests never need webkit2gtk/gtk3 to compile"
+edition = "2021"
+rust-version = "1.77"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+serde_json = "1"

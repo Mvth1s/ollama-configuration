@@ -4,6 +4,7 @@
 /gui/node_modules/
 /launcher/src-tauri/target/
 /launcher/src-tauri/gen/schemas/
+/launcher/launcher-core/target/
 /launcher/node_modules/
 
 # WebDriver e2e test runners (gui/e2e-tests, launcher/e2e-tests) - devDeps
