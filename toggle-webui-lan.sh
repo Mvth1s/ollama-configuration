@@ -33,7 +33,13 @@ UNIT_FILE="$HOME/.config/systemd/user/open-webui.service"
 
 current_host() {
   if [ -f "$WEBUI_ENV_FILE" ]; then
-    grep -m1 '^WEBUI_HOST=' "$WEBUI_ENV_FILE" | cut -d= -f2-
+    local host
+    host="$(grep -m1 '^WEBUI_HOST=' "$WEBUI_ENV_FILE" | cut -d= -f2-)"
+    if [ -n "$host" ]; then
+      echo "$host"
+    else
+      echo "127.0.0.1"
+    fi
   else
     echo "127.0.0.1"
   fi

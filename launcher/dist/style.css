@@ -10,12 +10,14 @@
   --muted: #8a8fa8;
   --muted-2: #9195ae;
   --muted-3: #a2a6be;
+  --faint: #b4b7c9;
 
   --bg: #edeef6;
   --card: #fff;
   --card-alt: #fbfbfe;
   --border: #eeeff6;
   --border-2: #e7e8f1;
+  --border-3: #f0f1f6;
 
   --ok: #10b981;
   --ok-bg: #f4fbf7;
@@ -255,6 +257,11 @@ section {
   cursor: default;
 }
 
+.toggle-track:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 2px;
+}
+
 .toggle-knob {
   width: 21px;
   height: 21px;
@@ -307,6 +314,11 @@ section {
   font-family: inherit;
 }
 
+.copy-btn:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 2px;
+}
+
 .qr-toggle-btn {
   margin-top: 9px;
   border: none;
@@ -317,6 +329,12 @@ section {
   cursor: pointer;
   font-family: inherit;
   padding: 0;
+}
+
+.qr-toggle-btn:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 .qr-wrap {
@@ -400,6 +418,15 @@ button.small {
 button:disabled {
   opacity: 0.6;
   cursor: default;
+}
+
+button:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 2px;
+}
+
+button:hover:not(:disabled) {
+  filter: brightness(1.08);
 }
 
 .empty {

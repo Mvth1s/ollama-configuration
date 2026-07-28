@@ -59,7 +59,7 @@ async function refreshModels() {
     renderModels(models);
   } catch (err) {
     showError(String(err));
-    modelsEmpty.textContent = 'Could not load models.';
+    modelsEmpty.textContent = 'Impossible de charger les modèles.';
     modelsEmpty.classList.remove('hidden');
     modelsTable.classList.add('hidden');
   }
@@ -69,7 +69,7 @@ function renderModels(models) {
   modelsBody.innerHTML = '';
 
   if (models.length === 0) {
-    modelsEmpty.textContent = 'No model installed yet.';
+    modelsEmpty.textContent = 'Aucun modèle installé.';
     modelsEmpty.classList.remove('hidden');
     modelsTable.classList.add('hidden');
     return;
@@ -101,7 +101,7 @@ function renderModels(models) {
     const deleteBtn = document.createElement('button');
     deleteBtn.type = 'button';
     deleteBtn.className = 'secondary small';
-    deleteBtn.textContent = 'Delete';
+    deleteBtn.textContent = 'Supprimer';
     deleteBtn.addEventListener('click', () => deleteModel(model.name));
     actionCell.appendChild(deleteBtn);
     row.appendChild(actionCell);
@@ -111,7 +111,7 @@ function renderModels(models) {
 }
 
 async function deleteModel(name) {
-  if (!confirm(`Delete ${name}? This cannot be undone.`)) {
+    if (!confirm(`Supprimer ${name} ? Cette action est irréversible.`)) {
     return;
   }
   try {
@@ -294,12 +294,12 @@ pullBtn.addEventListener('click', async () => {
 
   pullBtn.disabled = true;
   pullInput.disabled = true;
-  pullStatus.textContent = 'Starting...';
+  pullStatus.textContent = 'Démarrage...';
   clearError();
 
   try {
     await invoke('pull_model', { model: name });
-    pullStatus.textContent = `${name} ready.`;
+    pullStatus.textContent = `${name} prêt.`;
     pullInput.value = '';
     await refreshModels();
   } catch (err) {

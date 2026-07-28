@@ -11,7 +11,7 @@
 </head>
 <body>
 <main>
-  <nav id="stepper" class="stepper" aria-label="Etapes de l'installation"></nav>
+  <nav id="stepper" class="stepper" aria-label="Étapes de l'installation"></nav>
 
   <div class="content">
     <header class="step-header">
@@ -47,7 +47,7 @@
         <span id="install-label" class="install-label"></span>
         <span id="install-pct" class="install-pct"></span>
       </div>
-      <div class="progress-track"><div id="progress-fill" class="progress-fill"></div></div>
+      <div class="progress-track" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="Progression de l'installation"><div id="progress-fill" class="progress-fill"></div></div>
       <pre id="install-log" class="install-log" aria-live="polite"></pre>
     </section>
 

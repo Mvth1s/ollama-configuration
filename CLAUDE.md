@@ -264,7 +264,7 @@ All of this was written and committed **before** the site's actual first deploy 
 
 - Every script starts with `set -euo pipefail` and `cd "$(dirname "$0")"` (Bash) or `$ErrorActionPreference = 'Stop'` (PowerShell).
 - Scripts are idempotent: they check whether something is already installed/running before acting.
-- All user-visible strings are in English (see `f174bb7`, which translated the originally-French comments/log messages).
+- All user-visible strings are in English for the Bash/PowerShell scripts (see `f174bb7`, which translated the originally-French comments/log messages). The Tauri frontends (`gui/dist/`, `launcher/dist/`) use French UI strings by design.
 - Open WebUI runs as a user-level service, not system-level: `systemctl --user` on Linux, a per-user Scheduled Task on Windows. Linux autostart without an active login session needs `sudo loginctl enable-linger $USER`.
 - Open WebUI is deployed with `WEBUI_AUTH=False` (no login) and, since the LAN-access toggle, listens on `127.0.0.1` only by default — see [Open WebUI LAN access toggle](#open-webui-lan-access-toggle) and [README.md's Security note](README.md#security-note). `WEBUI_AUTH` and the bind address are deliberately independent switches; don't couple them (e.g. don't make enabling LAN access also flip `WEBUI_AUTH`) without asking first, since that's a product decision, not a bug fix.
 - The `AMD_GFX_OVERRIDE` map in `02-configure-gpu.sh` must be updated when ROCm adds official support for a GFX generation (remove the entry) or when a new unsupported generation ships (add the entry).
