@@ -17,14 +17,34 @@ source lib/common.sh
 load_state
 detect_distro
 
+# python3/pip/pipx via pkg_install always shells out to `sudo` (see
+# lib/common.sh), which is fine for a human running this script directly in a
+# terminal but breaks when the GUI runs it as its deliberately-unprivileged
+# webui step (Stdio::null() stdin, and often no controlling terminal at all):
+# sudo can't prompt and the whole process hangs waiting for a password that
+# can never arrive. install_webui_deps is only ever run through pkexec (see
+# gui/src-tauri/src/main.rs's "Installing Open WebUI prerequisites" step,
+# grouped with the other privileged steps) before this script's normal,
+# unprivileged run - and skips the pkg_install call entirely if pipx is
+# already present, so that normal run never has a reason to invoke sudo.
+install_webui_deps() {
+  command -v pipx >/dev/null 2>&1 && return 0
+  case "$DISTRO_FAMILY" in
+    arch)     pkg_install python python-pip pipx ;;
+    debian)   pkg_install python3 python3-pip pipx ;;
+    fedora)   pkg_install python3 python3-pip pipx ;;
+    opensuse) pkg_install python3 python3-pip python3-pipx ;;
+  esac
+}
+
+if [ "${1:-}" = "--install-deps" ]; then
+  install_webui_deps
+  exit 0
+fi
+
 log_info "Installing Open WebUI..."
 
-case "$DISTRO_FAMILY" in
-  arch)     pkg_install python python-pip pipx ;;
-  debian)   pkg_install python3 python3-pip pipx ;;
-  fedora)   pkg_install python3 python3-pip pipx ;;
-  opensuse) pkg_install python3 python3-pip python3-pipx ;;
-esac
+install_webui_deps
 
 if command -v pipx >/dev/null 2>&1; then
   pipx ensurepath >/dev/null 2>&1 || true
