@@ -1,8 +1,9 @@
 name: Test
 
 # Runs the bats suite (tests/*.bats) covering lib/common.sh and the four
-# numbered scripts + toggle-webui-lan.sh, and the Rust unit tests embedded in
-# gui/src-tauri and launcher/src-tauri. All bats tests run against a
+# numbered scripts + toggle-webui-lan.sh, and the Rust unit tests in
+# gui/src-tauri and launcher/launcher-core (the tauri-free crate holding
+# launcher/'s pure logic - see CLAUDE.md). All bats tests run against a
 # throwaway $HOME and a stubbed PATH (see tests/test_helper.bash) so nothing
 # here ever touches the runner's real package manager, systemd, or network.
 #
@@ -24,26 +25,50 @@ jobs:
       - name: Run bats suite
         run: bats tests/*.bats
 
+  # gui/'s unit tests (find_marker_upwards, __DETECT__ JSON parsing) live in
+  # src-tauri/src/main.rs, which imports tauri unconditionally, so testing
+  # them needs the full WebKitGTK dev stack installed either way. launcher/'s
+  # equivalent pure logic (to_model_info, parse_systemctl_is_active,
+  # build_lan_url, parse_webui_lan_status, format_webui_env) lives in the
+  # separate launcher-core crate (launcher/launcher-core, a plain lib with
+  # zero tauri/wry dependency - see CLAUDE.md), so its tests run without
+  # ever installing webkit2gtk/gtk3. launcher/src-tauri itself (the actual
+  # #[tauri::command] bindings) is still fully built and clippy'd by
+  # rust-ci.yml's clippy-and-build job, which does install those packages.
   rust-unit-tests:
+    name: rust-unit-tests (${{ matrix.name }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        app: [gui, launcher]
+        include:
+          - name: gui
+            test_dir: gui/src-tauri
+            needs_webkitgtk: true
+            cargo_test_args: ""
+          - name: launcher-core
+            test_dir: launcher/launcher-core
+            needs_webkitgtk: false
+            # --lib: launcher-core has no doc-tests, so this skips an
+            # rustdoc invocation with no benefit. gui/src-tauri has no [lib]
+            # target at all (`cargo test --lib` errors there with "no
+            # library targets found"), so it keeps plain `cargo test`.
+            cargo_test_args: "--lib"
     steps:
       - uses: actions/checkout@v7
 
       - uses: dtolnay/rust-toolchain@stable
 
       - name: Install Linux WebKitGTK dependencies
+        if: matrix.needs_webkitgtk
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libsoup-3.0-dev librsvg2-dev
 
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: "${{ matrix.app }}/src-tauri -> target"
+          workspaces: "${{ matrix.test_dir }} -> target"
 
       - name: cargo test
-        working-directory: ${{ matrix.app }}/src-tauri
-        run: cargo test
+        working-directory: ${{ matrix.test_dir }}
+        run: cargo test ${{ matrix.cargo_test_args }}

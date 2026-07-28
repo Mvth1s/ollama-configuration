@@ -1674,6 +1674,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "launcher-core"
+version = "0.1.0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "libappindicator"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2132,6 +2139,7 @@ dependencies = [
 name = "ollama-launcher"
 version = "0.1.0"
 dependencies = [
+ "launcher-core",
  "local-ip-address",
  "reqwest",
  "serde",

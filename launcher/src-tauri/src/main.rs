@@ -4,6 +4,7 @@
 // not go through Open WebUI's own admin panel for model management, and
 // does not touch setup.sh/setup.ps1 at all.
 
+use launcher_core::{build_lan_url, parse_systemctl_is_active, to_model_info, ModelInfo, TagsResponse};
 use serde::{Deserialize, Serialize};
 use std::io::{BufRead, BufReader};
 #[cfg(not(target_os = "windows"))]
@@ -13,36 +14,6 @@ use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 
 const OLLAMA_URL: &str = "http://127.0.0.1:11434";
 const WEBUI_URL: &str = "http://127.0.0.1:8080";
-
-#[derive(Debug, Deserialize)]
-struct TagsResponse {
-    models: Vec<RawModel>,
-}
-
-#[derive(Debug, Deserialize)]
-struct RawModel {
-    name: String,
-    size: u64,
-    modified_at: String,
-    #[serde(default)]
-    details: Option<RawDetails>,
-}
-
-#[derive(Debug, Default, Deserialize)]
-struct RawDetails {
-    parameter_size: Option<String>,
-    quantization_level: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct ModelInfo {
-    name: String,
-    size: u64,
-    modified_at: String,
-    parameter_size: String,
-    quantization_level: String,
-}
 
 #[tauri::command]
 fn list_models() -> Result<Vec<ModelInfo>, String> {
@@ -57,83 +28,15 @@ fn list_models() -> Result<Vec<ModelInfo>, String> {
     Ok(parsed.models.into_iter().map(to_model_info).collect())
 }
 
-// Split out from list_models so the RawModel -> ModelInfo mapping (in
-// particular the empty-string default when `details` is missing, which
-// Ollama does for some model types) can be unit-tested without a live
-// Ollama server.
-fn to_model_info(m: RawModel) -> ModelInfo {
-    let (parameter_size, quantization_level) = m
-        .details
-        .map(|d| (d.parameter_size.unwrap_or_default(), d.quantization_level.unwrap_or_default()))
-        .unwrap_or_default();
-    ModelInfo { name: m.name, size: m.size, modified_at: m.modified_at, parameter_size, quantization_level }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[test]
-    fn maps_full_details_from_ollamas_tags_response() {
-        let json = r#"{
-            "models": [{
-                "name": "llama3.1:8b",
-                "size": 4920753328,
-                "modified_at": "2026-01-01T00:00:00Z",
-                "details": { "parameter_size": "8B", "quantization_level": "Q4_0" }
-            }]
-        }"#;
-        let parsed: TagsResponse = serde_json::from_str(json).unwrap();
-        let info = to_model_info(parsed.models.into_iter().next().unwrap());
-
-        assert_eq!(info.name, "llama3.1:8b");
-        assert_eq!(info.size, 4920753328);
-        assert_eq!(info.parameter_size, "8B");
-        assert_eq!(info.quantization_level, "Q4_0");
-    }
-
-    #[test]
-    fn defaults_to_empty_strings_when_details_is_missing() {
-        let json = r#"{
-            "models": [{
-                "name": "custom-model:latest",
-                "size": 123,
-                "modified_at": "2026-01-01T00:00:00Z"
-            }]
-        }"#;
-        let parsed: TagsResponse = serde_json::from_str(json).unwrap();
-        let info = to_model_info(parsed.models.into_iter().next().unwrap());
-
-        assert_eq!(info.parameter_size, "");
-        assert_eq!(info.quantization_level, "");
-    }
-
-    #[test]
-    fn parses_normal_systemctl_is_active_output() {
-        assert_eq!(parse_systemctl_is_active("active\n"), "active");
-        assert_eq!(parse_systemctl_is_active("inactive\n"), "inactive");
-        assert_eq!(parse_systemctl_is_active("failed"), "failed");
-    }
-
-    #[test]
-    fn falls_back_to_unknown_on_empty_systemctl_output() {
-        assert_eq!(parse_systemctl_is_active(""), "unknown");
-        assert_eq!(parse_systemctl_is_active("   \n"), "unknown");
-    }
-
-    #[test]
-    fn builds_ipv4_lan_url_without_brackets() {
-        let ip: std::net::IpAddr = "192.168.1.42".parse().unwrap();
-        assert_eq!(build_lan_url(ip), "http://192.168.1.42:8080");
-    }
-
-    #[test]
-    fn builds_ipv6_lan_url_with_brackets() {
-        let ip: std::net::IpAddr = "fe80::1".parse().unwrap();
-        assert_eq!(build_lan_url(ip), "http://[fe80::1]:8080");
-    }
-
-    // Everything above stubs Ollama's responses with fixed JSON. This test
+    // Everything above (list_models/pull_model/delete_model) is exercised
+    // indirectly through launcher-core's own unit tests (to_model_info,
+    // parse_systemctl_is_active, build_lan_url, parse_webui_lan_status,
+    // format_webui_env - see launcher/launcher-core/src/lib.rs), which run
+    // without needing tauri/webkit2gtk at all. This test
     // instead exercises pull_model/list_models/delete_model against a REAL,
     // locally running Ollama daemon and its actual HTTP API - the gap the
     // roadmap flagged ("pull_model / delete_model jamais exercés pour de
@@ -274,14 +177,6 @@ fn webui_unit_installed() -> bool {
         .exists()
 }
 
-// Split out so the empty-output edge case (e.g. systemctl present but the
-// unit was just uninstalled from under us) can be unit-tested without a
-// real systemd user session.
-fn parse_systemctl_is_active(output: &str) -> String {
-    let trimmed = output.trim();
-    if trimmed.is_empty() { "unknown".to_string() } else { trimmed.to_string() }
-}
-
 #[cfg(not(target_os = "windows"))]
 #[tauri::command]
 fn webui_service_status() -> Result<String, String> {
@@ -353,16 +248,6 @@ Write-Output 'OK'
     }
 }
 
-// LAN URL for sharing (Copy button + QR code in the frontend). IPv6 needs
-// bracket syntax in a URL, hence the separate helper instead of a plain
-// format!("http://{ip}:8080").
-fn build_lan_url(ip: std::net::IpAddr) -> String {
-    match ip {
-        std::net::IpAddr::V4(v4) => format!("http://{v4}:8080"),
-        std::net::IpAddr::V6(v6) => format!("http://[{v6}]:8080"),
-    }
-}
-
 #[tauri::command]
 fn get_lan_url() -> Result<String, String> {
     let ip = local_ip_address::local_ip()
@@ -391,21 +276,19 @@ fn webui_env_path() -> PathBuf {
 #[tauri::command]
 fn webui_lan_status() -> bool {
     std::fs::read_to_string(webui_env_path())
-        .ok()
-        .and_then(|content| content.lines().find_map(|line| line.strip_prefix("WEBUI_HOST=").map(str::trim)).map(str::to_string))
-        .map(|host| host == "0.0.0.0")
+        .map(|content| launcher_core::parse_webui_lan_status(&content))
         .unwrap_or(false)
 }
 
 #[cfg(not(target_os = "windows"))]
 #[tauri::command]
 fn set_webui_lan(enabled: bool) -> Result<String, String> {
-    let host = if enabled { "0.0.0.0" } else { "127.0.0.1" };
     let path = webui_env_path();
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).map_err(|e| format!("Failed to create {}: {e}", parent.display()))?;
     }
-    std::fs::write(&path, format!("WEBUI_HOST={host}\n")).map_err(|e| format!("Failed to write {}: {e}", path.display()))?;
+    std::fs::write(&path, launcher_core::format_webui_env(enabled))
+        .map_err(|e| format!("Failed to write {}: {e}", path.display()))?;
 
     if !webui_unit_installed() {
         return Ok("Saved. Open WebUI is not installed yet; this will apply automatically once you install it.".into());
