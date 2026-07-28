@@ -1,3 +1,15 @@
+# [1.2.0](https://github.com/Mvth1s/ollama-configuration/compare/v1.1.4...v1.2.0) (2026-07-28)
+
+
+### Bug Fixes
+
+* **gui:** stream ollama pull's ANSI-redrawn progress instead of buffering it ([add58f4](https://github.com/Mvth1s/ollama-configuration/commit/add58f4fe028e72e17f3c442b23ad145edc97638))
+
+
+### Features
+
+* **packaging:** add Arch Linux PKGBUILDs for gui and launcher ([fd28179](https://github.com/Mvth1s/ollama-configuration/commit/fd28179de04bcd6df9f613f3509f48b96dd31a5b))
+
 ## [1.1.4](https://github.com/Mvth1s/ollama-configuration/compare/v1.1.3...v1.1.4) (2026-07-28)
 
 
