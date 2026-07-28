@@ -1,0 +1,57 @@
+# Maintainer: Mvth1s
+pkgname=ollama-launcher
+pkgver=1.1.4
+pkgrel=1
+pkgdesc="Daily launcher for Open WebUI and Ollama models"
+arch=('x86_64')
+url="https://github.com/Mvth1s/ollama-configuration"
+license=('MIT')
+depends=('webkit2gtk-4.1' 'gtk3')
+makedepends=('rust')
+source=("$pkgname-$pkgver.tar.gz::https://github.com/Mvth1s/ollama-configuration/archive/refs/tags/v$pkgver.tar.gz")
+sha256sums=('681730cc95b67d2ae1abfa133768bb448517be85495a85c262e1295ab8b4260a')
+
+# See gui/PKGBUILD for why a plain `cargo build --release` (no tauri-cli) is
+# enough: build.rs handles asset embedding either way, and this app's dist/
+# has no frontend build step. Unlike gui/, this app never touches
+# setup.sh/setup.ps1 (it talks directly to Ollama's/Open WebUI's local HTTP
+# APIs - see the repo-root CLAUDE.md), so there is no resource_dir()/scripts
+# directory to reproduce here.
+build() {
+  cd "ollama-configuration-$pkgver/launcher/src-tauri"
+  cargo build --release --locked
+}
+
+check() {
+  cd "ollama-configuration-$pkgver/launcher/src-tauri"
+  cargo test --release --locked
+}
+
+package() {
+  cd "ollama-configuration-$pkgver"
+
+  install -Dm755 "launcher/src-tauri/target/release/ollama-launcher" \
+    "$pkgdir/usr/bin/ollama-launcher"
+
+  # 128x128@2x.png is a real 256x256 PNG (macOS/Tauri @2x naming, not a
+  # literal hicolor size), so it belongs under hicolor's 256x256 tier.
+  install -Dm644 "launcher/src-tauri/icons/32x32.png" \
+    "$pkgdir/usr/share/icons/hicolor/32x32/apps/$pkgname.png"
+  install -Dm644 "launcher/src-tauri/icons/128x128.png" \
+    "$pkgdir/usr/share/icons/hicolor/128x128/apps/$pkgname.png"
+  install -Dm644 "launcher/src-tauri/icons/128x128@2x.png" \
+    "$pkgdir/usr/share/icons/hicolor/256x256/apps/$pkgname.png"
+
+  install -Dm644 /dev/stdin "$pkgdir/usr/share/applications/$pkgname.desktop" <<-EOF
+	[Desktop Entry]
+	Type=Application
+	Name=Ollama Launcher
+	Comment=$pkgdesc
+	Exec=ollama-launcher
+	Icon=$pkgname
+	Categories=Utility;
+	Terminal=false
+	EOF
+
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

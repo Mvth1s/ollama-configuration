@@ -199,6 +199,31 @@ A second, separate Tauri app (own `Cargo.toml`/`tauri.conf.json`/binary, not a m
 - The frontend's QR code (shown next to the shareable URL when LAN access is on) renders client-side via `launcher/dist/qrcode.js`, a vendored copy of the MIT-licensed [`qrcode-generator`](https://github.com/kazuhikoarase/qrcode-generator) library (same one referenced in the original design mockup) — vendored rather than pulled from a CDN so the app has no runtime network dependency for something purely presentational, consistent with the zero-npm-dependency frontend convention.
 - Same gitignore/Cargo.lock conventions as `gui/`, mirrored under `launcher/src-tauri/`.
 
+## Arch Linux packaging (`packaging/arch/`)
+
+A native alternative to the `.AppImage`, added after a real user reported the AppImage
+crashing on launch on EndeavourOS (Arch, AMD RDNA4 GPU) with `Could not create surfaceless
+EGL display: EGL_BAD_ALLOC` — traced to a mismatch between the AppImage's bundled
+`libwebkit2gtk-4.1` and the host's Mesa/amdgpu stack. `packaging/arch/gui/PKGBUILD` and
+`packaging/arch/launcher/PKGBUILD` build each app from source (`cargo build --release
+--locked`, no `tauri-cli`/`cargo tauri build` — asset embedding happens at compile time via
+`src-tauri/build.rs` either way, and neither frontend has a build step) and link against
+the system's own `webkit2gtk-4.1`/`gtk3` instead. `pkgver`/`sha256sums` are pinned to a
+specific release tag (not a `-git` package) — see `packaging/arch/README.md` for the
+bump-on-release process. `gui`'s `PKGBUILD` reproduces, by hand, the exact `/usr/lib/Ollama
+Stack GUI/scripts/` layout that `cargo tauri build`'s `.deb`/`.rpm` bundler already produces
+from `tauri.conf.json`'s `bundle.resources` (Tauri's `resource_dir()` resolves to
+`<exe_dir>/../lib/<productName>` on Linux for a non-bundled binary installed at
+`/usr/bin` — confirmed by reading `tauri-utils`' `resource_dir_from()` source directly) —
+without this, `find_scripts_dir()` in `gui/src-tauri/src/main.rs` would fail to find the
+scripts and hit the same `could not locate setup.sh` error already fixed once for the
+`.deb` bundle. `launcher/`'s `PKGBUILD` has no such resource step: it never touches
+`setup.sh`/`setup.ps1` at all. This was verified by building both apps from a pristine copy
+of the real `v1.1.4` release tarball with plain `cargo build --release --locked`/`cargo
+test --release --locked` (both pass) and manually replicating every `package()` install
+step against a throwaway root; a real `makepkg -si`/`pacman -U` run is still needed to
+fully confirm — see `packaging/arch/README.md`.
+
 ## Releases
 
 The root `package.json` is release tooling only (commitlint, husky, semantic-release) — it is not a JS project and has nothing to do with `gui/`/`launcher/`'s frontends, which still have zero npm dependency of their own.
