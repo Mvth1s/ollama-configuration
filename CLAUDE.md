@@ -203,6 +203,31 @@ A second, separate Tauri app (own `Cargo.toml`/`tauri.conf.json`/binary, not a m
 
 `launcher/src-tauri/src/main.rs` imports `tauri` unconditionally at the top of the file, so on Linux, compiling it at all — even just to run `cargo test` on a handful of pure string/JSON-parsing functions — pulls in the full `wry`/`webkit2gtk-sys` dependency chain, which needs `libwebkit2gtk-4.1-dev`/`libgtk-3-dev`/`libsoup-3.0-dev` installed first. `launcher/launcher-core` (a separate crate, `launcher/src-tauri/Cargo.toml` depends on it via a plain path dependency) holds every pure, tauri-free piece of logic pulled out of `main.rs`'s `#[tauri::command]`s: `to_model_info` (+ the `TagsResponse`/`RawModel`/`RawDetails`/`ModelInfo` types), `parse_systemctl_is_active`, `build_lan_url`, and `parse_webui_lan_status`/`format_webui_env` (the `webui.env` read/write logic behind `webui_lan_status`/`set_webui_lan`, previously inlined directly in those commands and untested). Its own `Cargo.toml` depends on nothing but `serde`(+`serde_json` as a dev-dependency for its tests) — no `tauri`, no `reqwest` — so `cd launcher/launcher-core && cargo test` runs in a few seconds with no system packages installed at all. `main.rs`'s commands (`list_models`, `webui_service_status`, `get_lan_url`, `webui_lan_status`, `set_webui_lan`, ...) call into these functions rather than reimplementing them; the app's actual `#[tauri::command]` wiring and I/O (HTTP calls, file reads/writes, `systemctl`) stay in `main.rs`, since those aren't the part worth unit-testing without a live Ollama/systemd session. `.github/workflows/test.yml`'s `rust-unit-tests` job reflects this split: the `gui` matrix entry still installs WebKitGTK and tests `gui/src-tauri` directly (its own unit tests — `find_marker_upwards`, `__DETECT__` JSON parsing — are in `main.rs` too, and `gui/` wasn't part of this split), while the `launcher-core` entry skips that apt install entirely and tests `launcher/launcher-core` instead; `launcher/src-tauri`'s full binary is still built and clippy'd (with WebKitGTK installed) by `rust-ci.yml`'s `clippy-and-build` job, so a compile error there still fails CI, just in a different job.
 
+## Arch Linux packaging (`packaging/arch/`)
+
+A native alternative to the `.AppImage`, added after a real user reported the AppImage
+crashing on launch on EndeavourOS (Arch, AMD RDNA4 GPU) with `Could not create surfaceless
+EGL display: EGL_BAD_ALLOC` — traced to a mismatch between the AppImage's bundled
+`libwebkit2gtk-4.1` and the host's Mesa/amdgpu stack. `packaging/arch/gui/PKGBUILD` and
+`packaging/arch/launcher/PKGBUILD` build each app from source (`cargo build --release
+--locked`, no `tauri-cli`/`cargo tauri build` — asset embedding happens at compile time via
+`src-tauri/build.rs` either way, and neither frontend has a build step) and link against
+the system's own `webkit2gtk-4.1`/`gtk3` instead. `pkgver`/`sha256sums` are pinned to a
+specific release tag (not a `-git` package) — see `packaging/arch/README.md` for the
+bump-on-release process. `gui`'s `PKGBUILD` reproduces, by hand, the exact `/usr/lib/Ollama
+Stack GUI/scripts/` layout that `cargo tauri build`'s `.deb`/`.rpm` bundler already produces
+from `tauri.conf.json`'s `bundle.resources` (Tauri's `resource_dir()` resolves to
+`<exe_dir>/../lib/<productName>` on Linux for a non-bundled binary installed at
+`/usr/bin` — confirmed by reading `tauri-utils`' `resource_dir_from()` source directly) —
+without this, `find_scripts_dir()` in `gui/src-tauri/src/main.rs` would fail to find the
+scripts and hit the same `could not locate setup.sh` error already fixed once for the
+`.deb` bundle. `launcher/`'s `PKGBUILD` has no such resource step: it never touches
+`setup.sh`/`setup.ps1` at all. This was verified by building both apps from a pristine copy
+of the real `v1.1.4` release tarball with plain `cargo build --release --locked`/`cargo
+test --release --locked` (both pass) and manually replicating every `package()` install
+step against a throwaway root; a real `makepkg -si`/`pacman -U` run is still needed to
+fully confirm — see `packaging/arch/README.md`.
+
 ## Releases
 
 The root `package.json` is release tooling only (commitlint, husky, semantic-release) — it is not a JS project and has nothing to do with `gui/`/`launcher/`'s frontends, which still have zero npm dependency of their own.
