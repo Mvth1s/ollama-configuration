@@ -1,3 +1,10 @@
+## [1.1.4](https://github.com/Mvth1s/ollama-configuration/compare/v1.1.3...v1.1.4) (2026-07-28)
+
+
+### Bug Fixes
+
+* **gui:** stop the GUI's webui step from hanging on a hidden sudo call ([e6e9d0c](https://github.com/Mvth1s/ollama-configuration/commit/e6e9d0c4492ff6514c386aa391c98a0ea02faaea))
+
 ## [1.1.3](https://github.com/Mvth1s/ollama-configuration/compare/v1.1.2...v1.1.3) (2026-07-27)
 
 
