@@ -89,6 +89,46 @@ declare -A AMD_GFX_OVERRIDE=(
   ["gfx1201"]="11.5.0"   # RDNA4 (RX 9070 / 9070 XT)
 )
 
+# Real ROCm packages sometimes install rocminfo outside PATH entirely -
+# confirmed in production on an Arch/EndeavourOS machine with an AMD RDNA4
+# GPU, where the rocminfo package places the binary under /opt/rocm/bin (or
+# a version-suffixed /opt/rocm-X.Y.Z/bin on distros that keep multiple ROCm
+# releases side by side) without ever adding it to PATH. find_rocminfo checks
+# PATH first (`command -v`, the previous - and only - lookup this script
+# used), then these two well-known install locations, printing the resolved
+# binary's path on stdout and returning 0 on success. Returns 1 (nothing
+# printed) if none is found anywhere, letting the caller fall back to plain
+# Vulkan without an HSA override, exactly like the pre-existing "chip not
+# recognized" case.
+#
+# ROCM_OPT_DIR defaults to /opt (the real, standard ROCm install root) but
+# can be overridden - same testability pattern as lib/common.sh's
+# OS_RELEASE_FILE - so tests can point it at a throwaway directory instead
+# of the real /opt, which a test must never write to.
+ROCM_OPT_DIR="${ROCM_OPT_DIR:-/opt}"
+
+find_rocminfo() {
+  if command -v rocminfo >/dev/null 2>&1; then
+    command -v rocminfo
+    return 0
+  fi
+
+  if [ -x "$ROCM_OPT_DIR/rocm/bin/rocminfo" ]; then
+    echo "$ROCM_OPT_DIR/rocm/bin/rocminfo"
+    return 0
+  fi
+
+  local candidate
+  for candidate in "$ROCM_OPT_DIR"/rocm-*/bin/rocminfo; do
+    if [ -x "$candidate" ]; then
+      echo "$candidate"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
 configure_amd() {
   log_info "Configuring AMD GPU..."
   case "$DISTRO_FAMILY" in
@@ -98,9 +138,9 @@ configure_amd() {
     opensuse) pkg_install vulkan-tools rocminfo ;;
   esac
 
-  local gfx=""
-  if command -v rocminfo >/dev/null 2>&1; then
-    gfx=$(rocminfo 2>/dev/null | grep -oE 'gfx[0-9]+' | head -n1 || true)
+  local gfx="" rocminfo_bin=""
+  if rocminfo_bin=$(find_rocminfo); then
+    gfx=$("$rocminfo_bin" 2>/dev/null | grep -oE 'gfx[0-9]+' | head -n1 || true)
   fi
 
   if [ -z "$gfx" ]; then
@@ -204,6 +244,18 @@ configure_nvidia() {
 # driver), which covers both iGPUs (Xe, Iris Xe, UHD) and dedicated Arc GPUs.
 # Best effort: if Ollama cannot use it, falls back to CPU automatically,
 # without a blocking error.
+#
+# NOT DISTINGUISHED: this applies OLLAMA_VULKAN=1 + OLLAMA_IGPU_ENABLE=1
+# uniformly to *any* GPU_VENDOR=intel match, whether it's an integrated GPU
+# or a discrete Arc card - there is no iGPU-vs-Arc branch here. This is
+# deliberate for now, not an oversight: a distinction was discussed during
+# earlier planning (the idea being that Vulkan on a discrete Arc card is far
+# more likely to be a net win than on some older/weaker iGPUs, where plain
+# CPU inference can sometimes be faster), but it has never been implemented
+# or validated against real Arc hardware - no such machine has been
+# available in any session that touched this script. Do not add an
+# iGPU/Arc branch here without testing on real discrete Arc hardware first;
+# see CLAUDE.md's Intel GPU handling section for the same note.
 # ---------------------------------------------------------------------------
 configure_intel() {
   log_info "Configuring Intel GPU (Vulkan, best effort)..."

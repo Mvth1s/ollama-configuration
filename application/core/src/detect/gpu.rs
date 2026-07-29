@@ -135,28 +135,55 @@ pub fn parse_gpu_from_pnp_device_ids(ids: &[String]) -> GpuInfo {
     GpuInfo::default()
 }
 
+/// Port of `find_rocminfo()`, added to `02-configure-gpu.sh` in the same
+/// change that added this function: real ROCm packages sometimes install
+/// `rocminfo` outside PATH entirely (confirmed in production on an
+/// Arch/EndeavourOS machine with an AMD RDNA4 GPU: the package places the
+/// binary under `/opt/rocm/bin` or a version-suffixed
+/// `/opt/rocm-X.Y.Z/bin`, neither ever added to PATH).
+///
+/// Every input here is a pre-gathered fact, same convention as the rest of
+/// this crate: this function makes no filesystem or process call itself. A
+/// real caller resolves `path_lookup` via `command -v rocminfo` (or `which`),
+/// `opt_rocm_bin_executable` via a metadata/executable-bit check on
+/// `/opt/rocm/bin/rocminfo`, and `opt_rocm_versioned_candidates` by listing
+/// `/opt/rocm-*/bin/rocminfo` matches that exist and are executable, in the
+/// same lexicographic order a shell glob would produce (this function just
+/// takes the first one, matching the Bash `for candidate in .../bin/rocminfo;
+/// do if [ -x "$candidate" ]; then ...; done` loop, which also stops at the
+/// first executable match).
+pub fn resolve_rocminfo_path(
+    path_lookup: Option<&str>,
+    opt_rocm_bin_executable: bool,
+    opt_rocm_versioned_candidates: &[String],
+) -> Option<String> {
+    if let Some(p) = path_lookup {
+        return Some(p.to_string());
+    }
+    if opt_rocm_bin_executable {
+        return Some("/opt/rocm/bin/rocminfo".to_string());
+    }
+    opt_rocm_versioned_candidates.first().cloned()
+}
+
 // ---------------------------------------------------------------------------
-// NOTE ON TWO CLAIMED "PRODUCTION TRAPS" THAT DO NOT ACTUALLY EXIST IN
-// scripts/linux/02-configure-gpu.sh TODAY (verified by direct inspection of
-// the current file before writing this port, not assumed):
+// NOTE ON A SECOND CLAIMED "PRODUCTION TRAP" THAT DOES NOT ACTUALLY EXIST IN
+// scripts/linux/02-configure-gpu.sh (verified by direct inspection of the
+// current file, not assumed): `configure_intel()` does not distinguish an
+// integrated GPU from a discrete Arc card. It applies `OLLAMA_VULKAN=1` +
+// `OLLAMA_IGPU_ENABLE=1` unconditionally to any `GPU_VENDOR=intel` match -
+// there is no separate "iGPU vs Arc" code path to port, in Bash or here.
 //
-//   1. There is no `find_rocminfo()` function, and no fallback lookup at
-//      `/opt/rocm/bin/rocminfo` or `/opt/rocm-*/bin/rocminfo`. The Bash
-//      script only ever does `command -v rocminfo` (a plain PATH check); if
-//      that fails, `gfx` stays empty and the script falls back to Vulkan
-//      without an HSA override, exactly like the "chip not recognized"
-//      case. `parse_amd_gfx` above is therefore a faithful port of what the
-//      script actually does today, not of the richer PATH-fallback behavior
-//      described in this phase's task prompt.
-//   2. `configure_intel()` does not distinguish an integrated GPU from a
-//      discrete Arc card: it applies `OLLAMA_VULKAN=1` +
-//      `OLLAMA_IGPU_ENABLE=1` unconditionally to any `GPU_VENDOR=intel`
-//      match. There is no separate "iGPU vs Arc" code path to port.
-//
-// Both would be new feature work (a real PATH-fallback probe, a real
-// iGPU/Arc distinction), not a port of existing logic - see this phase's
-// final report for detail. Flagging here rather than silently inventing
-// this behavior in Rust, which would itself be a new Bash/Rust divergence.
+// Unlike the rocminfo PATH fallback above (a confirmed regression, now
+// fixed in both scripts/linux/02-configure-gpu.sh and this crate), this is
+// NOT something to fix: it was never implemented and never validated
+// against real discrete Arc hardware in any session that touched this
+// script. The idea floated during earlier planning - that Vulkan is more
+// likely a net win on a discrete Arc card than on some weaker iGPUs, where
+// plain CPU inference can sometimes be faster - remains an untested
+// hypothesis. Do not add a `parse_intel_is_discrete`-style function or an
+// iGPU/Arc branch to this crate without validating on real Arc hardware
+// first; see CLAUDE.md's Intel GPU handling section for the same note.
 // ---------------------------------------------------------------------------
 
 #[cfg(test)]
@@ -269,5 +296,43 @@ Agent 2
     fn windows_no_known_vendor_falls_back_to_none() {
         let ids = vec!["PCI\\VEN_1234&DEV_0000".to_string()];
         assert_eq!(parse_gpu_from_pnp_device_ids(&ids), GpuInfo::default());
+    }
+
+    // -- resolve_rocminfo_path: not validated against real AMD RDNA4
+    // hardware (none was available in this session) - fixtures only. See
+    // the note above `resolve_rocminfo_path` and this phase's report.
+
+    #[test]
+    fn path_lookup_wins_over_opt_rocm_when_both_are_present() {
+        let candidates = vec!["/opt/rocm-6.1.0/bin/rocminfo".to_string()];
+        assert_eq!(
+            resolve_rocminfo_path(Some("/usr/bin/rocminfo"), true, &candidates).as_deref(),
+            Some("/usr/bin/rocminfo")
+        );
+    }
+
+    #[test]
+    fn falls_back_to_plain_opt_rocm_bin_when_not_on_path() {
+        assert_eq!(
+            resolve_rocminfo_path(None, true, &[]).as_deref(),
+            Some("/opt/rocm/bin/rocminfo")
+        );
+    }
+
+    #[test]
+    fn falls_back_to_first_versioned_opt_rocm_candidate_when_plain_bin_is_absent() {
+        let candidates = vec![
+            "/opt/rocm-6.1.0/bin/rocminfo".to_string(),
+            "/opt/rocm-6.2.0/bin/rocminfo".to_string(),
+        ];
+        assert_eq!(
+            resolve_rocminfo_path(None, false, &candidates).as_deref(),
+            Some("/opt/rocm-6.1.0/bin/rocminfo")
+        );
+    }
+
+    #[test]
+    fn none_found_anywhere_resolves_to_none() {
+        assert_eq!(resolve_rocminfo_path(None, false, &[]), None);
     }
 }
