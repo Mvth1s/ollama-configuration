@@ -31,6 +31,7 @@
 //! user account, so there is no equivalent "three separate elevated
 //! processes" problem to fix there. Nothing in this module runs on Windows.
 
+mod exec;
 pub mod protocol;
 pub mod steps;
 
@@ -167,15 +168,27 @@ impl PrivilegedPhaseHandle {
 /// resolve to a fake - scoped to this one spawned child via
 /// `Command::env`, never by mutating this process's own environment
 /// (`std::env::set_var` is process-global and would race against any other
-/// test running in a different thread at the same time).
+/// test running in a different thread at the same time). `extra_env` is
+/// the same idea generalized: empty in real use, and in tests that need
+/// the privileged worker to see one of the other testability overrides
+/// this crate/`core` already define (`OS_RELEASE_FILE`, `ROCM_OPT_DIR`,
+/// `OLLAMA_SERVICE_OVERRIDE_PATH`, ...) without mutating this process's own
+/// environment either - a fake `pkexec` that `exec`s its arguments (rather
+/// than just logging them, like `tests/single_pkexec_call.rs`'s does)
+/// re-invokes this same binary for real, which inherits whatever `Command`
+/// set here, scoped to that one process tree.
 pub fn spawn_privileged_phase(
     current_exe: &Path,
     opts: PrivilegedPhaseOptions,
     path_override: Option<&str>,
+    extra_env: &[(&str, &str)],
 ) -> std::io::Result<PrivilegedPhaseHandle> {
     let mut cmd = build_privileged_phase_command(current_exe, opts);
     if let Some(path) = path_override {
         cmd.env("PATH", path);
+    }
+    for (key, value) in extra_env {
+        cmd.env(key, value);
     }
     #[cfg(unix)]
     detach_from_tty(&mut cmd);
@@ -257,10 +270,19 @@ mod tests {
     }
 
     #[test]
-    fn run_privileged_worker_returns_zero_when_every_stub_step_succeeds() {
-        // default_privileged_steps' stubs always return Ok(()) today (see
-        // steps.rs) - this exercises the worker's real entry point end to
-        // end, not just run_steps in isolation.
-        assert_eq!(run_privileged_worker(&[]), 0);
+    fn run_privileged_worker_propagates_a_real_steps_failure_as_a_nonzero_exit() {
+        // Phase 6 replaced the placeholder steps with real ones (see
+        // steps/{ollama,gpu,webui}.rs) that really touch the system -
+        // running this under `cargo test` (no root, no real pkexec)
+        // reliably fails partway through (this machine's real Ollama is
+        // already installed and running, so the "ollama" step succeeds
+        // for real; the "gpu" step then really detects this machine's
+        // real GPU and tries a real package-manager install, which fails
+        // without root - confirmed by inspecting this test's own output).
+        // The "every step succeeds end to end" scenario is what
+        // tests/single_pkexec_call.rs's fake-pkexec-and-fake-tools harness
+        // covers instead, without needing real root or touching the real
+        // system.
+        assert_eq!(run_privileged_worker(&[]), 1);
     }
 }

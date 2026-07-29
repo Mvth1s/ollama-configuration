@@ -60,7 +60,7 @@ fn exactly_one_pkexec_call_covers_the_whole_privileged_phase() {
     let fake_path = fake_pkexec_path(&fake_bin_dir, &log_path);
 
     let current_exe = Path::new("/opt/selfllama/selfllama-installer");
-    let handle = spawn_privileged_phase(current_exe, PrivilegedPhaseOptions::default(), Some(&fake_path))
+    let handle = spawn_privileged_phase(current_exe, PrivilegedPhaseOptions::default(), Some(&fake_path), &[])
         .expect("failed to spawn the (fake) privileged phase");
 
     let lines: Vec<PhaseLine> = handle.lines.iter().collect();
@@ -115,6 +115,7 @@ fn skip_webui_is_forwarded_through_the_single_call_too() {
         current_exe,
         PrivilegedPhaseOptions { skip_webui: true },
         Some(&fake_path),
+        &[],
     )
     .unwrap();
     let _ = handle.lines.iter().count();
