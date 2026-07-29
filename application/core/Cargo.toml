@@ -1,0 +1,12 @@
+[package]
+name = "core"
+version = "0.1.0"
+description = "Pure, tauri-free system detection logic (GPU/RAM/CPU/distro) and ANSI-aware output streaming for the SelfLlama application/ workspace - ported from scripts/linux, scripts/windows/lib/common.ps1, and gui/src-tauri, kept as its own crate so its unit tests never need webkit2gtk/gtk3 to compile. Not yet wired into gui/ or launcher/ (see CLAUDE.md)."
+edition = "2021"
+rust-version = "1.77"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+serde_json = "1"
