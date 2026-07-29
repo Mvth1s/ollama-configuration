@@ -15,4 +15,5 @@
 //! later phase.
 
 pub mod detect;
+pub mod install;
 pub mod progress;
