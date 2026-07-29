@@ -42,9 +42,14 @@ pub struct PrivilegedStep {
 /// The real step sequence for a live run: ollama, then gpu, then (unless
 /// `--skip-webui`) webui-deps.
 pub fn default_privileged_steps(opts: &PrivilegedPhaseOptions) -> Vec<PrivilegedStep> {
+    let confirm_nvidia_driver_install = opts.confirm_nvidia_driver_install;
     let mut steps: Vec<PrivilegedStep> = vec![
         PrivilegedStep { id: "ollama", label: "Installing Ollama", run: Box::new(ollama::run) },
-        PrivilegedStep { id: "gpu", label: "Configuring GPU", run: Box::new(gpu::run) },
+        PrivilegedStep {
+            id: "gpu",
+            label: "Configuring GPU",
+            run: Box::new(move || gpu::run(confirm_nvidia_driver_install)),
+        },
     ];
     if !opts.skip_webui {
         steps.push(PrivilegedStep {
@@ -229,7 +234,7 @@ mod tests {
 
     #[test]
     fn default_steps_skip_webui_deps_when_requested() {
-        let opts = PrivilegedPhaseOptions { skip_webui: true };
+        let opts = PrivilegedPhaseOptions { skip_webui: true, ..Default::default() };
         let ids: Vec<&str> = default_privileged_steps(&opts).iter().map(|s| s.id).collect();
         assert_eq!(ids, vec!["ollama", "gpu"]);
     }

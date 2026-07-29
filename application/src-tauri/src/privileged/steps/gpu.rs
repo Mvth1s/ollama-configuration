@@ -19,7 +19,12 @@ use core::install::{DistroFamily, OllamaServiceOverride};
 use std::path::Path;
 use std::process::Command;
 
-pub fn run() -> Result<(), StepRunError> {
+/// `confirm_nvidia_driver_install`: `false` on a fresh run (the default -
+/// see `PrivilegedPhaseOptions`), `true` only on a second, deliberate
+/// re-invocation after a real caller (`gui/`, Phase 7) has actually shown
+/// the user `core::install::gpu::NvidiaPlan.confirmation`'s prompt and
+/// gotten a real "yes". This function never decides that answer itself.
+pub fn run(confirm_nvidia_driver_install: bool) -> Result<(), StepRunError> {
     let distro_info = parse_distro(read_os_release().as_deref());
     let distro = DistroFamily::from(distro_info.family.as_str());
 
@@ -28,7 +33,7 @@ pub fn run() -> Result<(), StepRunError> {
     println!("GPU selected for acceleration: {} ({})", if gpu.name.is_empty() { "none" } else { &gpu.name }, gpu.vendor);
 
     let override_action = match gpu.vendor.as_str() {
-        "nvidia" => run_nvidia(distro)?,
+        "nvidia" => run_nvidia(distro, confirm_nvidia_driver_install)?,
         "amd" => run_amd(distro)?,
         "intel" => run_intel(distro)?,
         _ => {
@@ -44,7 +49,7 @@ pub fn run() -> Result<(), StepRunError> {
     Ok(())
 }
 
-fn run_nvidia(distro: DistroFamily) -> Result<OllamaServiceOverride, StepRunError> {
+fn run_nvidia(distro: DistroFamily, confirm_nvidia_driver_install: bool) -> Result<OllamaServiceOverride, StepRunError> {
     let driver_present = command_exists("nvidia-smi");
     let driver_name = if driver_present {
         capture_stdout("nvidia-smi", &["--query-gpu=name", "--format=csv,noheader"])
@@ -60,11 +65,31 @@ fn run_nvidia(distro: DistroFamily) -> Result<OllamaServiceOverride, StepRunErro
     }
 
     if let Some(confirmation) = plan.confirmation {
-        return Err(StepRunError::NeedsConfirmation(ConfirmationRequest {
-            prompt_title: confirmation.prompt_title.to_string(),
-            prompt_message: confirmation.prompt_message.to_string(),
-            action_description: describe_action(&confirmation.action),
-        }));
+        if !confirm_nvidia_driver_install {
+            return Err(StepRunError::NeedsConfirmation(ConfirmationRequest {
+                prompt_title: confirmation.prompt_title.to_string(),
+                prompt_message: confirmation.prompt_message.to_string(),
+                action_description: describe_action(&confirmation.action),
+            }));
+        }
+
+        // Confirmed by a real caller on a prior attempt (see this
+        // function's own doc comment) - actually do it now, matching
+        // configure_nvidia's confirmed branch exactly (including
+        // openSUSE's manual-step case, which still only logs a message
+        // and installs nothing automatically).
+        println!("Nvidia driver install confirmed - proceeding.");
+        match &confirmation.action {
+            DistroAction::InstallPackages(packages) => {
+                run_commands(pkg_install_commands(distro, packages)).map_err(StepRunError::Failed)?;
+            }
+            DistroAction::ManualStepRequired(message) => {
+                println!("{message}");
+            }
+        }
+        if confirmation.reboot_required_after_install {
+            println!("Reboot the machine then re-run the installer to finish GPU configuration.");
+        }
     }
 
     Ok(plan.override_action)

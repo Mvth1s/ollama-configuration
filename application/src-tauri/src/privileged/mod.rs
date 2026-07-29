@@ -50,25 +50,44 @@ pub use steps::{default_privileged_steps, run_steps, PrivilegedStep, StepFailure
 /// `pkexec`'d copy of this same binary.
 pub const RUN_PRIVILEGED_PHASE_ARG: &str = "--run-privileged-phase";
 const SKIP_WEBUI_ARG: &str = "--skip-webui";
+const CONFIRM_NVIDIA_DRIVER_INSTALL_ARG: &str = "--confirm-nvidia-driver-install";
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct PrivilegedPhaseOptions {
     pub skip_webui: bool,
+    /// Added for `gui/`'s integration (Phase 7): a plan can require real
+    /// user confirmation before installing an Nvidia driver
+    /// (`core::install::gpu::NvidiaPlan.confirmation`, surfaced as
+    /// `steps::StepRunError::NeedsConfirmation` - see `steps::gpu::run`).
+    /// Since one worker process only ever gets one shot at the whole
+    /// sequence, there is no way to "pause mid-process and resume" -  a
+    /// caller that already asked the user and got a real "yes" sets this to
+    /// `true` on a **second** `spawn_privileged_phase` call so that this
+    /// run actually installs the driver instead of stopping at the same
+    /// confirmation point again. Defaults to `false`: a fresh run always
+    /// asks first, never silently assumes consent.
+    pub confirm_nvidia_driver_install: bool,
 }
 
 impl PrivilegedPhaseOptions {
     fn to_args(self) -> Vec<String> {
+        let mut args = Vec::new();
         if self.skip_webui {
-            vec![SKIP_WEBUI_ARG.to_string()]
-        } else {
-            Vec::new()
+            args.push(SKIP_WEBUI_ARG.to_string());
         }
+        if self.confirm_nvidia_driver_install {
+            args.push(CONFIRM_NVIDIA_DRIVER_INSTALL_ARG.to_string());
+        }
+        args
     }
 
     /// Parses the args a worker process was invoked with (everything after
     /// [`RUN_PRIVILEGED_PHASE_ARG`] itself).
     pub fn from_args(args: &[String]) -> Self {
-        PrivilegedPhaseOptions { skip_webui: args.iter().any(|a| a == SKIP_WEBUI_ARG) }
+        PrivilegedPhaseOptions {
+            skip_webui: args.iter().any(|a| a == SKIP_WEBUI_ARG),
+            confirm_nvidia_driver_install: args.iter().any(|a| a == CONFIRM_NVIDIA_DRIVER_INSTALL_ARG),
+        }
     }
 }
 
@@ -256,7 +275,7 @@ mod tests {
     fn passes_skip_webui_through_to_the_worker() {
         let cmd = build_privileged_phase_command(
             Path::new("/usr/bin/selfllama-installer"),
-            PrivilegedPhaseOptions { skip_webui: true },
+            PrivilegedPhaseOptions { skip_webui: true, ..Default::default() },
         );
         let args: Vec<String> = cmd.get_args().map(|a| a.to_string_lossy().into_owned()).collect();
         assert_eq!(args, vec!["/usr/bin/selfllama-installer", "--run-privileged-phase", "--skip-webui"]);
@@ -265,8 +284,28 @@ mod tests {
     #[test]
     fn worker_side_parses_skip_webui_back_out_of_its_own_args() {
         let args = vec!["--skip-webui".to_string()];
-        assert_eq!(PrivilegedPhaseOptions::from_args(&args), PrivilegedPhaseOptions { skip_webui: true });
-        assert_eq!(PrivilegedPhaseOptions::from_args(&[]), PrivilegedPhaseOptions { skip_webui: false });
+        assert_eq!(PrivilegedPhaseOptions::from_args(&args), PrivilegedPhaseOptions { skip_webui: true, ..Default::default() });
+        assert_eq!(PrivilegedPhaseOptions::from_args(&[]), PrivilegedPhaseOptions::default());
+    }
+
+    #[test]
+    fn confirm_nvidia_driver_install_defaults_to_false_and_round_trips_through_args() {
+        // A fresh run must never silently assume consent - see gui/'s
+        // Phase 7 integration report and PrivilegedPhaseOptions's own doc
+        // comment.
+        assert!(!PrivilegedPhaseOptions::default().confirm_nvidia_driver_install);
+
+        let opts = PrivilegedPhaseOptions { confirm_nvidia_driver_install: true, ..Default::default() };
+        let cmd = build_privileged_phase_command(Path::new("/usr/bin/selfllama-installer"), opts);
+        let args: Vec<String> = cmd.get_args().map(|a| a.to_string_lossy().into_owned()).collect();
+        assert_eq!(
+            args,
+            vec!["/usr/bin/selfllama-installer", "--run-privileged-phase", "--confirm-nvidia-driver-install"]
+        );
+        // args[0] is the re-invoked binary's own path, args[1] is the
+        // RUN_PRIVILEGED_PHASE_ARG sentinel itself - from_args only ever
+        // sees what comes after both, same as main.rs's real dispatch.
+        assert_eq!(PrivilegedPhaseOptions::from_args(&args[2..].to_vec()), opts);
     }
 
     #[test]

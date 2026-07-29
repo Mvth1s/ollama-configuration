@@ -320,7 +320,12 @@ function appendLog(stream, text) {
   installLogEl.scrollTop = installLogEl.scrollHeight;
 }
 
-async function startInstall() {
+// confirmNvidiaDriverInstall: true only on the deliberate re-run fired
+// from the install-confirmation-needed handler below, once the user has
+// really answered a real confirm() dialog - never set on a normal run, so
+// installing an Nvidia driver always needs a real "yes" first, never an
+// assumed one.
+async function startInstall({ confirmNvidiaDriverInstall = false } = {}) {
   installLogEl.textContent = '';
   state.installSteps = new Map();
   state.installDone = null;
@@ -331,6 +336,7 @@ async function startInstall() {
     skipModels: state.skipModels,
     skipWebui: state.skipWebui,
     models: state.skipModels ? null : state.models,
+    confirmNvidiaDriverInstall,
   };
 
   try {
@@ -360,6 +366,27 @@ listen('install-done', (event) => {
     state.maxStep = Math.max(state.maxStep, 4);
     render();
     renderDone();
+  }
+});
+
+// Fired instead of install-done when core::install::gpu::NvidiaPlan's
+// driver-install needs a real decision (see CLAUDE.md's
+// application::privileged section) - resolved here with a real confirm()
+// dialog, the same UX pattern launcher/'s model-deletion confirmation
+// already uses for irreversible/consequential actions, never assumed
+// silently one way or the other. Accepting re-runs the whole install with
+// confirmNvidiaDriverInstall: true (a second, deliberate privileged phase,
+// this time actually installing the driver); declining stops here, shown
+// the same way a real failure would be.
+listen('install-confirmation-needed', (event) => {
+  const { promptTitle, promptMessage, actionDescription } = event.payload;
+  const accepted = window.confirm(`${promptTitle}\n\n${promptMessage}\n\n${actionDescription}`);
+  if (accepted) {
+    startInstall({ confirmNvidiaDriverInstall: true });
+  } else {
+    appendLog('meta', 'Installation annulée : pilote Nvidia non installé.');
+    state.installDone = { success: false, message: 'Installation annulée : pilote Nvidia non installé.' };
+    renderProgress();
   }
 });
 

@@ -113,7 +113,7 @@ fn skip_webui_is_forwarded_through_the_single_call_too() {
     let current_exe = Path::new("/opt/selfllama/selfllama-installer");
     let handle = spawn_privileged_phase(
         current_exe,
-        PrivilegedPhaseOptions { skip_webui: true },
+        PrivilegedPhaseOptions { skip_webui: true, ..Default::default() },
         Some(&fake_path),
         &[],
     )

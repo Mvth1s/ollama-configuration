@@ -236,3 +236,54 @@ fn nvidia_without_a_driver_stops_the_sequence_with_needs_confirmation_not_a_sile
     // And no package was ever installed without a confirmed decision.
     assert!(pacman_calls.is_empty(), "must not install a driver without confirmation: {pacman_calls}");
 }
+
+#[test]
+fn nvidia_confirmed_on_a_second_call_actually_installs_the_driver() {
+    // Same scenario as above, but this is the second call gui/ would make
+    // after a real user really clicked "yes" - PrivilegedPhaseOptions'
+    // confirm_nvidia_driver_install is now true.
+    let fx = build_fixture("nvidia-confirmed");
+    write_script(&fx.fake_bin.join("lspci"), "echo '01:00.0 VGA compatible controller [0300]: NVIDIA Corporation TU104 [GeForce RTX 2080] [10de:1e87] (rev a1)'");
+    fs::remove_file(fx.fake_bin.join("rocminfo")).ok();
+
+    let path = fx.path_value();
+    let os_release = fx.os_release.to_string_lossy().into_owned();
+    let rocm_opt_dir = fx.rocm_opt_dir.to_string_lossy().into_owned();
+    let override_path = fx.override_path.to_string_lossy().into_owned();
+
+    let current_exe = installer_binary_path();
+    let handle = spawn_privileged_phase(
+        &current_exe,
+        PrivilegedPhaseOptions { confirm_nvidia_driver_install: true, ..Default::default() },
+        Some(&path),
+        &[
+            ("OS_RELEASE_FILE", &os_release),
+            ("ROCM_OPT_DIR", &rocm_opt_dir),
+            ("OLLAMA_SERVICE_OVERRIDE_PATH", &override_path),
+        ],
+    )
+    .unwrap();
+
+    let lines: Vec<String> = handle
+        .lines
+        .iter()
+        .map(|line| match line {
+            PhaseLine::Stdout(s) | PhaseLine::Stderr(s) => s,
+        })
+        .collect();
+    let status = handle.wait();
+    let pacman_calls = fs::read_to_string(&fx.pacman_log).unwrap_or_default();
+    fs::remove_dir_all(&fx.tmp).ok();
+
+    assert_eq!(status, Ok(()), "full log:\n{}", lines.join("\n"));
+
+    // The whole point: a confirmed decision really reaches pacman, with
+    // core::install::gpu::nvidia_plan's exact Arch package list.
+    assert_eq!(pacman_calls.trim(), "-Sy --noconfirm --needed nvidia nvidia-utils");
+
+    let joined = lines.join("\n");
+    assert!(joined.contains(r#""id":"gpu","label":"Configuring GPU","status":"done""#), "{joined}");
+    assert!(joined.contains("Nvidia driver install confirmed - proceeding."));
+    assert!(joined.contains("Reboot the machine then re-run the installer"));
+    assert!(!joined.contains("needsconfirmation"), "{joined}");
+}
