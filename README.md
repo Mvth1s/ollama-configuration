@@ -39,7 +39,7 @@ More detail on both apps: [`gui/README.md`](gui/README.md) (installer) and [`lau
 ```bash
 git clone https://github.com/Mvth1s/ollama-configuration.git
 cd ollama-configuration
-./setup.sh
+./scripts/linux/setup.sh
 ```
 
 The web interface is then available at **http://localhost:8080**.
@@ -47,11 +47,11 @@ The web interface is then available at **http://localhost:8080**.
 ## Options
 
 ```bash
-./setup.sh                   # full install, auto-detection
-./setup.sh --tier=M          # force a specific model tier (XS / S / M / L)
-./setup.sh --skip-models     # install Ollama + GPU + WebUI without models
-./setup.sh --skip-webui      # skip Open WebUI installation
-./setup.sh --no-tui          # disable the interactive dialog/whiptail menus
+./scripts/linux/setup.sh                   # full install, auto-detection
+./scripts/linux/setup.sh --tier=M          # force a specific model tier (XS / S / M / L)
+./scripts/linux/setup.sh --skip-models     # install Ollama + GPU + WebUI without models
+./scripts/linux/setup.sh --skip-webui      # skip Open WebUI installation
+./scripts/linux/setup.sh --no-tui          # disable the interactive dialog/whiptail menus
 ```
 
 ## Interactive mode (TUI)
@@ -65,10 +65,10 @@ Neither `dialog` nor `whiptail` is a hard requirement. If neither is installed, 
 Each script can be re-run on its own without reinstalling everything:
 
 ```bash
-./01-install-ollama.sh                          # install Ollama and start the service
-./02-configure-gpu.sh [--no-tui]                # detect GPU and configure acceleration
-./03-pull-models.sh [--tier=XS|S|M|L] [--no-tui] # download models
-./04-install-webui.sh                           # install Open WebUI
+./scripts/linux/01-install-ollama.sh                          # install Ollama and start the service
+./scripts/linux/02-configure-gpu.sh [--no-tui]                # detect GPU and configure acceleration
+./scripts/linux/03-pull-models.sh [--tier=XS|S|M|L] [--no-tui] # download models
+./scripts/linux/04-install-webui.sh                           # install Open WebUI
 ```
 
 ## Model tiers
@@ -111,21 +111,21 @@ sudo loginctl enable-linger $USER
 
 ## Windows installation
 
-A separate, native PowerShell implementation (`setup.ps1` + `lib\common.ps1`), not a port of the Bash scripts and not meant to run under WSL:
+A separate, native PowerShell implementation (`scripts\windows\setup.ps1` + `scripts\windows\lib\common.ps1`), not a port of the Bash scripts and not meant to run under WSL:
 
 ```powershell
 git clone https://github.com/Mvth1s/ollama-configuration.git
 cd ollama-configuration
-.\setup.ps1
+.\scripts\windows\setup.ps1
 ```
 
 Options:
 
 ```powershell
-.\setup.ps1                     # full install, auto-detection
-.\setup.ps1 -Tier M             # force a specific model tier (XS / S / M / L)
-.\setup.ps1 -SkipModels         # install Ollama + Open WebUI without models
-.\setup.ps1 -SkipWebui          # skip Open WebUI installation
+.\scripts\windows\setup.ps1                     # full install, auto-detection
+.\scripts\windows\setup.ps1 -Tier M             # force a specific model tier (XS / S / M / L)
+.\scripts\windows\setup.ps1 -SkipModels         # install Ollama + Open WebUI without models
+.\scripts\windows\setup.ps1 -SkipWebui          # skip Open WebUI installation
 ```
 
 Same RAM-based tier auto-selection and model tables as the table above. GPU handling is intentionally minimal: the official Ollama Windows installer already detects CUDA and ROCm natively, so the script only detects the GPU vendor (same PCI vendor IDs as the Linux scripts) to log it, and warns if an AMD GPU may fall outside ROCm's officially supported list on Windows.
@@ -144,15 +144,15 @@ Open WebUI is installed with **no login** (`WEBUI_AUTH=False`) — anyone who ca
 If you want to reach it from another device on your network (e.g. a phone), enable LAN access at any time, on or off, without reinstalling anything:
 
 ```bash
-./toggle-webui-lan.sh on       # reachable from your local network
-./toggle-webui-lan.sh off      # back to this machine only (default)
-./toggle-webui-lan.sh status   # show the current setting
+./scripts/linux/toggle-webui-lan.sh on       # reachable from your local network
+./scripts/linux/toggle-webui-lan.sh off      # back to this machine only (default)
+./scripts/linux/toggle-webui-lan.sh status   # show the current setting
 ```
 
 ```powershell
-.\toggle-webui-lan.ps1 on
-.\toggle-webui-lan.ps1 off
-.\toggle-webui-lan.ps1 status
+.\scripts\windows\toggle-webui-lan.ps1 on
+.\scripts\windows\toggle-webui-lan.ps1 off
+.\scripts\windows\toggle-webui-lan.ps1 status
 ```
 
 Turning LAN access **on** prints a warning every time, because `WEBUI_AUTH` stays `False`: once reachable from the network, anyone on it can use Open WebUI, including pulling/deleting models, without logging in. If that's not acceptable for your network, enable login instead of (or in addition to) LAN access:
@@ -173,22 +173,23 @@ The sections below are for contributors working on this repo itself — skip the
 
 ### Linting
 
-Bash scripts are checked with [ShellCheck](https://www.shellcheck.net/) ([`.github/workflows/lint.yml`](.github/workflows/lint.yml)). Run the same check locally from the repo root:
+Bash scripts are checked with [ShellCheck](https://www.shellcheck.net/) ([`.github/workflows/lint.yml`](.github/workflows/lint.yml)). Run the same check locally, from within `scripts/linux/` itself (not the repo root — ShellCheck resolves each script's `source lib/common.sh` relative to its own working directory):
 
 ```bash
+cd scripts/linux
 shellcheck -x *.sh lib/*.sh
 ```
 
-`setup.ps1`/`lib/common.ps1`/`toggle-webui-lan.ps1` are checked the same way with [PSScriptAnalyzer](https://github.com/PowerShell/PSScriptAnalyzer):
+`scripts/windows/setup.ps1`/`scripts/windows/lib/common.ps1`/`scripts/windows/toggle-webui-lan.ps1` are checked the same way with [PSScriptAnalyzer](https://github.com/PowerShell/PSScriptAnalyzer):
 
 ```powershell
 Install-Module -Name PSScriptAnalyzer -Scope CurrentUser
-Invoke-ScriptAnalyzer -Path setup.ps1, lib/common.ps1, toggle-webui-lan.ps1
+Invoke-ScriptAnalyzer -Path scripts/windows/setup.ps1, scripts/windows/lib/common.ps1, scripts/windows/toggle-webui-lan.ps1
 ```
 
 ### Tests
 
-[`tests/`](tests/) holds a [bats](https://github.com/bats-core/bats-core) suite covering `lib/common.sh` and the tier/GPU-vendor/LAN-toggle logic in the numbered scripts. Every test runs against a throwaway `$HOME` and a stubbed `PATH` (see [`tests/test_helper.bash`](tests/test_helper.bash)), so it never touches the real package manager, systemd, or network — safe to run on your own machine, not just in CI:
+[`tests/`](tests/) holds a [bats](https://github.com/bats-core/bats-core) suite covering `scripts/linux/lib/common.sh` and the tier/GPU-vendor/LAN-toggle logic in the numbered scripts (all under `scripts/linux/`). Every test runs against a throwaway `$HOME` and a stubbed `PATH` (see [`tests/test_helper.bash`](tests/test_helper.bash)), so it never touches the real package manager, systemd, or network — safe to run on your own machine, not just in CI:
 
 ```bash
 bats tests/*.bats

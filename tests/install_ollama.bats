@@ -20,7 +20,7 @@ teardown() {
 }
 
 @test "already installed: skips the install script and reports ready" {
-  run "$REPO_ROOT/01-install-ollama.sh"
+  run "$REPO_ROOT/scripts/linux/01-install-ollama.sh"
   [ "$status" -eq 0 ]
   [[ "$output" == *"Ollama already installed"* ]]
   [[ "$output" == *"Ollama is ready at http://127.0.0.1:11434"* ]]

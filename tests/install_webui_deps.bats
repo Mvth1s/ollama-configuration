@@ -34,13 +34,13 @@ write_os_release() {
 }
 
 @test "--install-deps: skips pkg_install (no sudo call) when pipx is already present" {
-  run "$REPO_ROOT/04-install-webui.sh" --install-deps
+  run "$REPO_ROOT/scripts/linux/04-install-webui.sh" --install-deps
   [ "$status" -eq 0 ]
   [ ! -s "$STUB_LOG" ]
 }
 
 @test "--install-deps: exits before the rest of the script runs" {
-  run "$REPO_ROOT/04-install-webui.sh" --install-deps
+  run "$REPO_ROOT/scripts/linux/04-install-webui.sh" --install-deps
   [ "$status" -eq 0 ]
   [[ "$output" != *"Installing Open WebUI..."* ]]
 }

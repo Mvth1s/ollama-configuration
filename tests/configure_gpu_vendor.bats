@@ -43,7 +43,7 @@ echo "01:00.0 3D controller [0302]: NVIDIA Corporation GA107M [GeForce RTX 3050 
 
 @test "no dedicated GPU: falls back to CPU, no driver install attempted" {
   stub_lspci none
-  run "$REPO_ROOT/02-configure-gpu.sh" --no-tui
+  run "$REPO_ROOT/scripts/linux/02-configure-gpu.sh" --no-tui
   [ "$status" -eq 0 ]
   [[ "$output" == *"No dedicated GPU, Ollama will run on CPU."* ]]
 }
@@ -53,7 +53,7 @@ echo "01:00.0 3D controller [0302]: NVIDIA Corporation GA107M [GeForce RTX 3050 
   stub_cmd nvidia-smi '
     if [ "$1" = "--query-gpu=name" ]; then echo "NVIDIA GeForce RTX 3070"; fi
   '
-  run "$REPO_ROOT/02-configure-gpu.sh" --no-tui
+  run "$REPO_ROOT/scripts/linux/02-configure-gpu.sh" --no-tui
   [ "$status" -eq 0 ]
   [[ "$output" == *"GPU selected for acceleration:"*"(nvidia)"* ]]
   [[ "$output" == *"Configuring Nvidia GPU (CUDA)"* ]]
@@ -62,7 +62,7 @@ echo "01:00.0 3D controller [0302]: NVIDIA Corporation GA107M [GeForce RTX 3050 
 
 @test "Nvidia GPU without a driver: declining the install prompt does not install anything" {
   stub_lspci nvidia
-  run bash -c "printf 'n\n' | '$REPO_ROOT/02-configure-gpu.sh' --no-tui"
+  run bash -c "printf 'n\n' | '$REPO_ROOT/scripts/linux/02-configure-gpu.sh' --no-tui"
   [ "$status" -eq 0 ]
   [[ "$output" == *"No Nvidia driver detected"* ]]
   [[ "$output" == *"GPU configuration complete."* ]]
@@ -73,7 +73,7 @@ echo "01:00.0 3D controller [0302]: NVIDIA Corporation GA107M [GeForce RTX 3050 
   stub_cmd nvidia-smi '
     if [ "$1" = "--query-gpu=name" ]; then echo "NVIDIA GeForce RTX 3050 Mobile"; fi
   '
-  run "$REPO_ROOT/02-configure-gpu.sh" --no-tui
+  run "$REPO_ROOT/scripts/linux/02-configure-gpu.sh" --no-tui
   [ "$status" -eq 0 ]
   [[ "$output" == *"GPU selected for acceleration:"*"(nvidia)"* ]]
 }
@@ -81,7 +81,7 @@ echo "01:00.0 3D controller [0302]: NVIDIA Corporation GA107M [GeForce RTX 3050 
 @test "AMD GPU with an unsupported gfx code: falls back to Vulkan + HSA override" {
   stub_lspci amd
   stub_cmd rocminfo 'echo "  Name: gfx1201"'
-  run "$REPO_ROOT/02-configure-gpu.sh" --no-tui
+  run "$REPO_ROOT/scripts/linux/02-configure-gpu.sh" --no-tui
   [ "$status" -eq 0 ]
   [[ "$output" == *"gfx1201 is not yet officially supported by ROCm."* ]]
   [[ "$output" == *"Applying workaround: OLLAMA_VULKAN=1 + HSA_OVERRIDE_GFX_VERSION=11.5.0"* ]]
@@ -90,14 +90,14 @@ echo "01:00.0 3D controller [0302]: NVIDIA Corporation GA107M [GeForce RTX 3050 
 @test "AMD GPU with an officially supported gfx code: uses default HIP config" {
   stub_lspci amd
   stub_cmd rocminfo 'echo "  Name: gfx1030"'
-  run "$REPO_ROOT/02-configure-gpu.sh" --no-tui
+  run "$REPO_ROOT/scripts/linux/02-configure-gpu.sh" --no-tui
   [ "$status" -eq 0 ]
   [[ "$output" == *"gfx1030 is officially supported by ROCm, using default config (HIP)."* ]]
 }
 
 @test "AMD GPU with rocminfo unavailable: enables Vulkan without a specific workaround" {
   stub_lspci amd
-  run "$REPO_ROOT/02-configure-gpu.sh" --no-tui
+  run "$REPO_ROOT/scripts/linux/02-configure-gpu.sh" --no-tui
   [ "$status" -eq 0 ]
   [[ "$output" == *"GFX code not detected"* ]]
   [[ "$output" == *"Enabling Vulkan backend by default, without a specific workaround."* ]]
@@ -105,14 +105,14 @@ echo "01:00.0 3D controller [0302]: NVIDIA Corporation GA107M [GeForce RTX 3050 
 
 @test "Intel GPU: enables the best-effort Vulkan backend" {
   stub_lspci intel
-  run "$REPO_ROOT/02-configure-gpu.sh" --no-tui
+  run "$REPO_ROOT/scripts/linux/02-configure-gpu.sh" --no-tui
   [ "$status" -eq 0 ]
   [[ "$output" == *"Configuring Intel GPU (Vulkan, best effort)"* ]]
 }
 
 @test "--detect-only prints a __DETECT__ JSON line and never configures a driver" {
   stub_lspci nvidia
-  run "$REPO_ROOT/02-configure-gpu.sh" --detect-only --no-tui
+  run "$REPO_ROOT/scripts/linux/02-configure-gpu.sh" --detect-only --no-tui
   [ "$status" -eq 0 ]
   [[ "$output" == *'__DETECT__{"distro_pretty":'* ]]
   [[ "$output" == *'"gpu_vendor":"nvidia"'* ]]
@@ -122,7 +122,7 @@ echo "01:00.0 3D controller [0302]: NVIDIA Corporation GA107M [GeForce RTX 3050 
 
 @test "--detect-only reports the CPU model and thread count" {
   stub_lspci none
-  run "$REPO_ROOT/02-configure-gpu.sh" --detect-only --no-tui
+  run "$REPO_ROOT/scripts/linux/02-configure-gpu.sh" --detect-only --no-tui
   [ "$status" -eq 0 ]
   [[ "$output" == *'"cpu_model":'* ]]
   [[ "$output" == *'"cpu_threads":'* ]]

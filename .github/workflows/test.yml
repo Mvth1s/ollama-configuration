@@ -1,7 +1,8 @@
 name: Test
 
-# Runs the bats suite (tests/*.bats) covering lib/common.sh and the four
-# numbered scripts + toggle-webui-lan.sh, and the Rust unit tests in
+# Runs the bats suite (tests/*.bats) covering scripts/linux/lib/common.sh and
+# the four numbered scripts + toggle-webui-lan.sh (all under scripts/linux/),
+# and the Rust unit tests in
 # gui/src-tauri and launcher/launcher-core (the tauri-free crate holding
 # launcher/'s pure logic - see CLAUDE.md). All bats tests run against a
 # throwaway $HOME and a stubbed PATH (see tests/test_helper.bash) so nothing

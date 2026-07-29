@@ -35,14 +35,14 @@
       "icons/icon.png"
     ],
     "resources": {
-      "../../setup.sh": "scripts/setup.sh",
-      "../../01-install-ollama.sh": "scripts/01-install-ollama.sh",
-      "../../02-configure-gpu.sh": "scripts/02-configure-gpu.sh",
-      "../../03-pull-models.sh": "scripts/03-pull-models.sh",
-      "../../04-install-webui.sh": "scripts/04-install-webui.sh",
-      "../../lib/common.sh": "scripts/lib/common.sh",
-      "../../setup.ps1": "scripts/setup.ps1",
-      "../../lib/common.ps1": "scripts/lib/common.ps1"
+      "../../scripts/linux/setup.sh": "scripts/setup.sh",
+      "../../scripts/linux/01-install-ollama.sh": "scripts/01-install-ollama.sh",
+      "../../scripts/linux/02-configure-gpu.sh": "scripts/02-configure-gpu.sh",
+      "../../scripts/linux/03-pull-models.sh": "scripts/03-pull-models.sh",
+      "../../scripts/linux/04-install-webui.sh": "scripts/04-install-webui.sh",
+      "../../scripts/linux/lib/common.sh": "scripts/lib/common.sh",
+      "../../scripts/windows/setup.ps1": "scripts/setup.ps1",
+      "../../scripts/windows/lib/common.ps1": "scripts/lib/common.ps1"
     }
   }
 }
