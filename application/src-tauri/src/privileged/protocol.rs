@@ -36,6 +36,16 @@ pub enum StepStatus {
     Done,
     Failed,
     NeedsConfirmation,
+    /// Still `Running`, but the currently-executing command is known (see
+    /// `exec::is_known_silent_package_manager`) to go quiet for a long
+    /// stretch with zero output - `pacman`/`dnf`/`zypper`'s network phase,
+    /// per CLAUDE.md's Phase 2 investigation (30-100+s of silence is
+    /// normal, not a hang). Distinct from plain `Running` so a caller can
+    /// show a static "still working" message instead of leaving prolonged
+    /// silence to be mistaken for a stall - never carries a percentage or
+    /// any other fabricated progress figure, only `StepEvent.message`'s
+    /// static text.
+    RunningSilent,
 }
 
 /// The data a future interactive caller (gui/, out of scope for this
@@ -62,6 +72,15 @@ pub struct StepEvent {
     pub error: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub confirmation: Option<ConfirmationRequest>,
+    /// `Some` only alongside `StepStatus::RunningSilent` - a static status
+    /// line (e.g. "Running pacman - this can take a while with no output,
+    /// which is expected and not a hang."), never a percentage or any other
+    /// invented progress figure. `None` for every other status; omitted
+    /// from the wire format entirely in that case so existing `__STEP__`
+    /// lines for `Running`/`Done`/`Failed`/`NeedsConfirmation` are
+    /// byte-for-byte unchanged.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub message: Option<String>,
 }
 
 /// `__STEP__{"id":"ollama","label":"Installing Ollama","status":"running"}`.
@@ -90,6 +109,7 @@ mod tests {
             status: StepStatus::Running,
             error: None,
             confirmation: None,
+            message: None,
         };
         let line = format_step_event(&event);
         assert_eq!(parse_step_event(&line), Some(event));
@@ -103,6 +123,7 @@ mod tests {
             status: StepStatus::Failed,
             error: Some("pacman exited with status 1".into()),
             confirmation: None,
+            message: None,
         };
         let line = format_step_event(&event);
         assert_eq!(parse_step_event(&line), Some(event));
@@ -120,9 +141,41 @@ mod tests {
                 prompt_message: "Install the Nvidia driver now? (requires a reboot afterwards)".into(),
                 action_description: "install packages: nvidia, nvidia-utils".into(),
             }),
+            message: None,
         };
         let line = format_step_event(&event);
         assert_eq!(parse_step_event(&line), Some(event));
+    }
+
+    #[test]
+    fn round_trips_a_running_silent_event_with_a_static_message() {
+        let event = StepEvent {
+            id: "gpu".into(),
+            label: "Configuring GPU".into(),
+            status: StepStatus::RunningSilent,
+            error: None,
+            confirmation: None,
+            message: Some("Running pacman - this can take a while with no output, which is expected and not a hang.".into()),
+        };
+        let line = format_step_event(&event);
+        assert_eq!(parse_step_event(&line), Some(event));
+    }
+
+    #[test]
+    fn running_silent_serializes_without_a_percentage_or_any_other_numeric_progress_field() {
+        // The whole point of this status: only ever a static string, never
+        // a fabricated number - so the JSON itself must never carry one.
+        let event = StepEvent {
+            id: "gpu".into(),
+            label: "Configuring GPU".into(),
+            status: StepStatus::RunningSilent,
+            error: None,
+            confirmation: None,
+            message: Some("Running dnf...".into()),
+        };
+        let json = format_step_event(&event).strip_prefix(STEP_MARKER).unwrap().to_string();
+        assert!(!json.contains("percent"), "{json}");
+        assert!(!json.contains("progress"), "{json}");
     }
 
     #[test]

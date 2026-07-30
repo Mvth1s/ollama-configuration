@@ -20,6 +20,18 @@ mod webui;
 use super::protocol::{format_step_event, ConfirmationRequest, StepEvent, StepStatus};
 use super::PrivilegedPhaseOptions;
 
+// Single source of truth for each step's id/label, so `default_privileged_steps`
+// below and the `emit_running_silent` calls in `gpu.rs`/`webui.rs` (fired
+// mid-step, not by `run_steps`) can never drift apart - private items are
+// visible to descendant modules in Rust, so `steps::gpu`/`steps::webui`
+// reach these via `super::GPU_STEP_ID` etc. without any `pub` needed.
+const OLLAMA_STEP_ID: &str = "ollama";
+const OLLAMA_STEP_LABEL: &str = "Installing Ollama";
+const GPU_STEP_ID: &str = "gpu";
+const GPU_STEP_LABEL: &str = "Configuring GPU";
+const WEBUI_DEPS_STEP_ID: &str = "webui-deps";
+const WEBUI_DEPS_STEP_LABEL: &str = "Installing Open WebUI prerequisites";
+
 /// What a step's `run` closure can report besides success. Kept distinct
 /// from a single `String` error (Phase 4's shape) specifically so the
 /// Nvidia GPU step's "driver missing, confirmation required" case (see
@@ -44,17 +56,17 @@ pub struct PrivilegedStep {
 pub fn default_privileged_steps(opts: &PrivilegedPhaseOptions) -> Vec<PrivilegedStep> {
     let confirm_nvidia_driver_install = opts.confirm_nvidia_driver_install;
     let mut steps: Vec<PrivilegedStep> = vec![
-        PrivilegedStep { id: "ollama", label: "Installing Ollama", run: Box::new(ollama::run) },
+        PrivilegedStep { id: OLLAMA_STEP_ID, label: OLLAMA_STEP_LABEL, run: Box::new(ollama::run) },
         PrivilegedStep {
-            id: "gpu",
-            label: "Configuring GPU",
+            id: GPU_STEP_ID,
+            label: GPU_STEP_LABEL,
             run: Box::new(move || gpu::run(confirm_nvidia_driver_install)),
         },
     ];
     if !opts.skip_webui {
         steps.push(PrivilegedStep {
-            id: "webui-deps",
-            label: "Installing Open WebUI prerequisites",
+            id: WEBUI_DEPS_STEP_ID,
+            label: WEBUI_DEPS_STEP_LABEL,
             run: Box::new(webui::run),
         });
     }
@@ -96,6 +108,7 @@ pub fn run_steps(steps: &[PrivilegedStep]) -> Result<(), StepFailure> {
             status: StepStatus::Running,
             error: None,
             confirmation: None,
+            message: None,
         });
 
         match (step.run)() {
@@ -106,6 +119,7 @@ pub fn run_steps(steps: &[PrivilegedStep]) -> Result<(), StepFailure> {
                     status: StepStatus::Done,
                     error: None,
                     confirmation: None,
+                    message: None,
                 });
             }
             Err(StepRunError::Failed(message)) => {
@@ -115,6 +129,7 @@ pub fn run_steps(steps: &[PrivilegedStep]) -> Result<(), StepFailure> {
                     status: StepStatus::Failed,
                     error: Some(message.clone()),
                     confirmation: None,
+                    message: None,
                 });
                 return Err(StepFailure { step_id: step.id.to_string(), message, confirmation: None });
             }
@@ -125,6 +140,7 @@ pub fn run_steps(steps: &[PrivilegedStep]) -> Result<(), StepFailure> {
                     status: StepStatus::NeedsConfirmation,
                     error: None,
                     confirmation: Some(confirmation.clone()),
+                    message: None,
                 });
                 return Err(StepFailure {
                     step_id: step.id.to_string(),
@@ -139,6 +155,24 @@ pub fn run_steps(steps: &[PrivilegedStep]) -> Result<(), StepFailure> {
 
 fn emit(event: StepEvent) {
     println!("{}", format_step_event(&event));
+}
+
+/// Emitted mid-step (not by `run_steps` above, which only ever emits at a
+/// step's start/end) whenever `exec::run_commands_reporting_silent_phase`'s
+/// `on_silent_phase` callback fires - see `gpu.rs`/`webui.rs`'s call sites.
+/// Still `StepStatus::RunningSilent`, not `Done`/`Failed`: the step is not
+/// over, this is purely an informational update about *how* it's currently
+/// progressing (or rather, known to not be progressing visibly for a
+/// while).
+fn emit_running_silent(id: &'static str, label: &'static str, message: String) {
+    emit(StepEvent {
+        id: id.into(),
+        label: label.into(),
+        status: StepStatus::RunningSilent,
+        error: None,
+        confirmation: None,
+        message: Some(message),
+    });
 }
 
 #[cfg(test)]

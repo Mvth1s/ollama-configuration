@@ -49,6 +49,7 @@ const modelsFooterEl = el('models-footer');
 const installLabelEl = el('install-label');
 const installPctEl = el('install-pct');
 const progressFillEl = el('progress-fill');
+const installSilentStatusEl = el('install-silent-status');
 const installLogEl = el('install-log');
 const doneSubtitleEl = el('done-subtitle');
 const summaryEl = el('summary');
@@ -327,6 +328,7 @@ function appendLog(stream, text) {
 // assumed one.
 async function startInstall({ confirmNvidiaDriverInstall = false } = {}) {
   installLogEl.textContent = '';
+  installSilentStatusEl.classList.add('hidden');
   state.installSteps = new Map();
   state.installDone = null;
   renderProgress();
@@ -350,11 +352,29 @@ async function startInstall({ confirmNvidiaDriverInstall = false } = {}) {
 
 listen('install-log', (event) => {
   appendLog(event.payload.stream, event.payload.text);
+  // A real output line is exactly the signal that a known-silent phase
+  // (pacman/dnf/zypper) isn't silent anymore right now - clear the static
+  // status immediately rather than waiting for the step's own next
+  // transition event.
+  installSilentStatusEl.classList.add('hidden');
 });
 
+// status is one of: pending | running | running-silent | done | failed |
+// skipped | needs-confirmation. "running-silent" (see CLAUDE.md's
+// application::privileged section) means the step is still genuinely
+// running, but the command it's currently waiting on (pacman/dnf/zypper) is
+// known to print nothing for a long stretch - message is a static status
+// line for that case only, never a percentage or any other fabricated
+// progress figure.
 listen('install-step', (event) => {
-  const { id, label, status } = event.payload;
+  const { id, label, status, message } = event.payload;
   state.installSteps.set(id, { label, status });
+  if (status === 'running-silent' && message) {
+    installSilentStatusEl.textContent = message;
+    installSilentStatusEl.classList.remove('hidden');
+  } else {
+    installSilentStatusEl.classList.add('hidden');
+  }
   if (state.step === 3) renderProgress();
 });
 

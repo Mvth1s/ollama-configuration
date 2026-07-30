@@ -89,10 +89,57 @@ pub fn pkg_install_commands(distro: DistroFamily, packages: &[&str]) -> Vec<Comm
 /// Runs `commands` in order with inherited stdio, stopping at the first
 /// non-zero exit (mirrors every `pkg_install`/script call in Bash running
 /// under `set -e`: a failed package install aborts the step, it never
-/// silently continues to the next command).
+/// silently continues to the next command). A thin wrapper around
+/// [`run_commands_reporting_silent_phase`] with a no-op callback - existing
+/// callers (systemd `daemon-reload`/`restart`, ...) never invoke a package
+/// manager, so they have no use for the silent-phase signal.
 pub fn run_commands(commands: Vec<Command>) -> Result<(), String> {
+    run_commands_reporting_silent_phase(commands, |_program| {})
+}
+
+/// Package managers whose install/download phase is known, from CLAUDE.md's
+/// Phase 2 investigation, to announce the whole transaction and then print
+/// nothing at all for a long stretch (30-100+s on a realistic connection,
+/// sometimes longer) until it finishes - unlike `apt-get` (per-file
+/// progress plus `\r`-driven `dpkg` output) or `curl` (a continuous `\r`
+/// percentage bar), both already surfaced live by
+/// `core::progress::stream_ansi_aware` and needing no special handling
+/// here. Keyed purely on the program name a command is about to run, not on
+/// anything it prints - the whole point is to say something *before* any
+/// silence could be mistaken for a hang, not to react to silence after the
+/// fact (which would risk exactly the timeout/hang-detection logic CLAUDE.md
+/// explicitly rules out for this case).
+pub fn is_known_silent_package_manager(program: &str) -> bool {
+    matches!(program, "pacman" | "dnf" | "zypper")
+}
+
+/// The static status text for a recognized silent phase - deliberately just
+/// a plain sentence, never a percentage or any other fabricated progress
+/// figure (see CLAUDE.md's Phase 2 conclusion: silence here is normal, and
+/// must never be presented as measured progress it isn't).
+pub fn silent_phase_message(program: &str) -> String {
+    format!("Running {program} - this can take a while with no output, which is expected and not a hang.")
+}
+
+/// Same execution contract as [`run_commands`] (runs `commands` in order
+/// with inherited stdio, stopping at the first non-zero exit), but calls
+/// `on_silent_phase` with the command's program name right before running
+/// any command recognized by [`is_known_silent_package_manager`]. This
+/// module has no notion of which privileged step (`gpu`, `webui-deps`, ...)
+/// is currently running, by design - `on_silent_phase` is injected so the
+/// real callers (`steps::gpu`/`steps::webui`) can emit a `__STEP__` line
+/// carrying their own step id/label, and so this function stays testable
+/// (see the tests below) without spawning a real package manager or
+/// capturing this process's own stdout.
+pub fn run_commands_reporting_silent_phase(
+    commands: Vec<Command>,
+    mut on_silent_phase: impl FnMut(&str),
+) -> Result<(), String> {
     for mut cmd in commands {
         let program = cmd.get_program().to_string_lossy().into_owned();
+        if is_known_silent_package_manager(&program) {
+            on_silent_phase(&program);
+        }
         cmd.stdin(Stdio::null()).stdout(Stdio::inherit()).stderr(Stdio::inherit());
         let status = cmd.status().map_err(|e| format!("failed to start {program}: {e}"))?;
         if !status.success() {
@@ -251,5 +298,82 @@ mod tests {
     #[test]
     fn command_exists_is_false_for_something_that_cannot_plausibly_be_installed() {
         assert!(!command_exists("selfllama-installer-definitely-not-a-real-command-xyz"));
+    }
+
+    #[test]
+    fn pacman_dnf_and_zypper_are_recognized_as_known_silent_package_managers() {
+        assert!(is_known_silent_package_manager("pacman"));
+        assert!(is_known_silent_package_manager("dnf"));
+        assert!(is_known_silent_package_manager("zypper"));
+    }
+
+    #[test]
+    fn apt_get_and_curl_are_not_treated_as_silent_package_managers() {
+        // Both are already well-handled live by
+        // core::progress::stream_ansi_aware (per-file + \r dpkg output for
+        // apt-get, a continuous \r bar for curl) - this indicator must not
+        // fire for them, or it would show a stale "still working" message
+        // right alongside their own real, already-live progress output.
+        assert!(!is_known_silent_package_manager("apt-get"));
+        assert!(!is_known_silent_package_manager("curl"));
+    }
+
+    #[test]
+    fn other_commands_this_module_shells_out_to_are_not_treated_as_silent_package_managers() {
+        assert!(!is_known_silent_package_manager("systemctl"));
+        assert!(!is_known_silent_package_manager("sh"));
+        assert!(!is_known_silent_package_manager("ollama"));
+    }
+
+    #[test]
+    fn silent_phase_message_names_the_program_and_carries_no_percentage() {
+        let message = silent_phase_message("pacman");
+        assert!(message.contains("pacman"), "{message}");
+        assert!(!message.contains('%'), "{message}");
+    }
+
+    #[test]
+    fn emits_a_silent_phase_marker_right_before_a_silent_prone_package_manager_would_run() {
+        let mut seen: Vec<String> = Vec::new();
+        // pacman is not expected to be installed on the machine running
+        // this suite (this repo's CI and most dev machines are
+        // Debian/Ubuntu-based) - the command will fail to spawn, but the
+        // marker must fire before that attempt is even made, since the
+        // whole point is to announce the risk of silence *before* it could
+        // happen, not react to an actual hang.
+        let commands = vec![Command::new("pacman")];
+        let result = run_commands_reporting_silent_phase(commands, |program| seen.push(program.to_string()));
+        assert_eq!(seen, vec!["pacman".to_string()]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn does_not_emit_a_silent_phase_marker_for_apt_get() {
+        let mut seen: Vec<String> = Vec::new();
+        // apt-get with no subcommand exits non-zero fast, with a usage
+        // message, and makes no network call - safe to actually run.
+        let commands = vec![Command::new("apt-get")];
+        let _ = run_commands_reporting_silent_phase(commands, |program| seen.push(program.to_string()));
+        assert!(seen.is_empty(), "{seen:?}");
+    }
+
+    #[test]
+    fn does_not_emit_a_silent_phase_marker_for_curl() {
+        let mut seen: Vec<String> = Vec::new();
+        // curl with no arguments exits non-zero fast with a usage message
+        // and makes no network call - safe to actually run.
+        let commands = vec![Command::new("curl")];
+        let _ = run_commands_reporting_silent_phase(commands, |program| seen.push(program.to_string()));
+        assert!(seen.is_empty(), "{seen:?}");
+    }
+
+    #[test]
+    fn run_commands_delegates_with_no_silent_phase_side_effect() {
+        // run_commands itself must still behave exactly as before: an
+        // unknown/nonexistent program still fails the same way, with no
+        // observable difference from the refactor into
+        // run_commands_reporting_silent_phase.
+        let result = run_commands(vec![Command::new("selfllama-installer-definitely-not-a-real-command-xyz")]);
+        assert!(result.is_err());
     }
 }

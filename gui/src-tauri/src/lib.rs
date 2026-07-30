@@ -210,11 +210,23 @@ struct LogLine {
 struct InstallStep {
     id: String,
     label: String,
-    status: String, // "pending" | "running" | "done" | "failed" | "skipped"
+    status: String, // "pending" | "running" | "running-silent" | "done" | "failed" | "skipped" | "needs-confirmation"
+    // Some only alongside "running-silent" - a static status line (see
+    // selfllama_installer::privileged::protocol::StepEvent's own doc
+    // comment), never a percentage or any other fabricated progress figure.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    message: Option<String>,
 }
 
 fn emit_step(app: &AppHandle, id: &str, label: &str, status: &str) {
-    let _ = app.emit("install-step", InstallStep { id: id.into(), label: label.into(), status: status.into() });
+    emit_step_with_message(app, id, label, status, None);
+}
+
+fn emit_step_with_message(app: &AppHandle, id: &str, label: &str, status: &str, message: Option<&str>) {
+    let _ = app.emit(
+        "install-step",
+        InstallStep { id: id.into(), label: label.into(), status: status.into(), message: message.map(str::to_string) },
+    );
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -557,8 +569,14 @@ fn run_privileged_phase(app: &AppHandle, opts: &InstallOptions) -> Result<Option
                     PrivStepStatus::Done => "done",
                     PrivStepStatus::Failed => "failed",
                     PrivStepStatus::NeedsConfirmation => "needs-confirmation",
+                    // Still mid-step, not a new transition on its own - see
+                    // this crate's CLAUDE.md section on the silent-phase
+                    // indicator. event.message carries the static status
+                    // text (pacman/dnf/zypper's known-silent network phase);
+                    // never a percentage.
+                    PrivStepStatus::RunningSilent => "running-silent",
                 };
-                emit_step(app, &event.id, &event.label, status);
+                emit_step_with_message(app, &event.id, &event.label, status, event.message.as_deref());
                 if let Some(error) = &event.error {
                     emit_log(app, "stderr", format!("{}: {error}", event.label));
                 }

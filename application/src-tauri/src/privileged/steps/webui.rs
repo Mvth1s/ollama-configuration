@@ -14,8 +14,10 @@
 //! outside `pkexec` entirely, unaffected by any of this restructure.
 //! Wiring those up is therefore not this phase's job.
 
-use super::super::exec::{command_exists, pkg_install_commands, read_os_release, run_commands};
-use super::StepRunError;
+use super::super::exec::{
+    command_exists, pkg_install_commands, read_os_release, run_commands_reporting_silent_phase, silent_phase_message,
+};
+use super::{emit_running_silent, StepRunError, WEBUI_DEPS_STEP_ID, WEBUI_DEPS_STEP_LABEL};
 use core::detect::distro::parse_distro;
 use core::install::webui::{deps_plan, DepsPlan};
 use core::install::DistroFamily;
@@ -31,7 +33,10 @@ pub fn run() -> Result<(), StepRunError> {
             Ok(())
         }
         DepsPlan::InstallPackages(packages) => {
-            run_commands(pkg_install_commands(distro, &packages)).map_err(StepRunError::Failed)
+            run_commands_reporting_silent_phase(pkg_install_commands(distro, &packages), |program| {
+                emit_running_silent(WEBUI_DEPS_STEP_ID, WEBUI_DEPS_STEP_LABEL, silent_phase_message(program));
+            })
+            .map_err(StepRunError::Failed)
         }
     }
 }

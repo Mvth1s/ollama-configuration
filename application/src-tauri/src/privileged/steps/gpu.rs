@@ -7,11 +7,11 @@
 //! either way - see this phase's report.
 
 use super::super::exec::{
-    command_exists, pkg_install_commands, read_os_release, resolve_on_path, rocm_opt_candidates, run_commands,
-    capture_stdout,
+    capture_stdout, command_exists, pkg_install_commands, read_os_release, resolve_on_path, rocm_opt_candidates,
+    run_commands, run_commands_reporting_silent_phase, silent_phase_message,
 };
 use super::super::protocol::ConfirmationRequest;
-use super::StepRunError;
+use super::{emit_running_silent, StepRunError, GPU_STEP_ID, GPU_STEP_LABEL};
 use core::detect::distro::parse_distro;
 use core::detect::gpu::{parse_amd_gfx, parse_gpu_from_lspci, resolve_rocminfo_path};
 use core::install::gpu::{amd_plan, intel_plan, nvidia_plan, none_plan, DistroAction};
@@ -81,7 +81,10 @@ fn run_nvidia(distro: DistroFamily, confirm_nvidia_driver_install: bool) -> Resu
         println!("Nvidia driver install confirmed - proceeding.");
         match &confirmation.action {
             DistroAction::InstallPackages(packages) => {
-                run_commands(pkg_install_commands(distro, packages)).map_err(StepRunError::Failed)?;
+                run_commands_reporting_silent_phase(pkg_install_commands(distro, packages), |program| {
+                    emit_running_silent(GPU_STEP_ID, GPU_STEP_LABEL, silent_phase_message(program));
+                })
+                .map_err(StepRunError::Failed)?;
             }
             DistroAction::ManualStepRequired(message) => {
                 println!("{message}");
@@ -104,7 +107,10 @@ fn run_amd(distro: DistroFamily) -> Result<OllamaServiceOverride, StepRunError> 
     // exposing amd_packages() as a separate pub function core::install
     // didn't already choose to expose in Phase 5) is cheap and pure.
     let packages = amd_plan(distro, None).packages;
-    run_commands(pkg_install_commands(distro, &packages)).map_err(StepRunError::Failed)?;
+    run_commands_reporting_silent_phase(pkg_install_commands(distro, &packages), |program| {
+        emit_running_silent(GPU_STEP_ID, GPU_STEP_LABEL, silent_phase_message(program));
+    })
+    .map_err(StepRunError::Failed)?;
 
     let path_lookup = resolve_on_path("rocminfo");
     let (opt_bin_executable, versioned_candidates) = rocm_opt_candidates();
@@ -126,7 +132,10 @@ fn run_amd(distro: DistroFamily) -> Result<OllamaServiceOverride, StepRunError> 
 
 fn run_intel(distro: DistroFamily) -> Result<OllamaServiceOverride, StepRunError> {
     let plan = intel_plan(distro);
-    run_commands(pkg_install_commands(distro, &plan.packages)).map_err(StepRunError::Failed)?;
+    run_commands_reporting_silent_phase(pkg_install_commands(distro, &plan.packages), |program| {
+        emit_running_silent(GPU_STEP_ID, GPU_STEP_LABEL, silent_phase_message(program));
+    })
+    .map_err(StepRunError::Failed)?;
     Ok(plan.override_action)
 }
 
