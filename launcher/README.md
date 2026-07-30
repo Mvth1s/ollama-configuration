@@ -1,4 +1,4 @@
-# Ollama Launcher
+# SelfLlama Launcher
 
 A small day-to-day companion app, separate from [`gui/`](../gui/README.md) (which only handles the one-off install). It does not touch `setup.sh`/`setup.ps1` at all. Jobs:
 

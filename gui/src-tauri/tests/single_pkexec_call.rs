@@ -4,7 +4,7 @@
 //! for `selfllama-installer` re-invoking itself. What's genuinely new here
 //! is `gui/src-tauri/src/main.rs`'s sentinel-argument dispatch (added this
 //! phase, mirroring `selfllama-installer`'s own `main.rs`): without it,
-//! `pkexec` re-invoking `ollama-stack-gui` would try to launch a second
+//! `pkexec` re-invoking `selfllama-gui` would try to launch a second
 //! full Tauri/GTK GUI as root instead of running the privileged worker
 //! code. This test proves that dispatch actually works, end to end,
 //! through a real (fake-tooled) process tree.
@@ -12,12 +12,12 @@
 //! Same harness idiom as `application/src-tauri/tests/
 //! real_plans_end_to_end.rs`: a fake `pkexec` that really `exec`s its
 //! arguments, re-invoking the real, freshly-`cargo test`-built
-//! `ollama-stack-gui` binary (not this test binary - see
+//! `selfllama-gui` binary (not this test binary - see
 //! `installer_binary_path` below) with `--run-privileged-phase`, against a
 //! `PATH` of fakes for every external tool the real steps shell out to. No
 //! real root, no real pkexec, never touches the real system.
 
-use ollama_stack_gui::run_privileged_phase_raw;
+use selfllama_gui::run_privileged_phase_raw;
 use selfllama_installer::privileged::PrivilegedPhaseOptions;
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
@@ -30,17 +30,17 @@ fn write_script(path: &Path, body: &str) {
     fs::set_permissions(path, perms).unwrap();
 }
 
-/// The real `ollama-stack-gui` `[[bin]]`, not this test's own binary - see
+/// The real `selfllama-gui` `[[bin]]`, not this test's own binary - see
 /// `application/src-tauri/tests/real_plans_end_to_end.rs`'s identical
 /// helper for why `std::env::current_exe()` alone isn't enough here.
 fn installer_binary_path() -> PathBuf {
     let test_exe = std::env::current_exe().expect("current_exe");
     let deps_dir = test_exe.parent().expect("deps dir");
     let target_debug = deps_dir.parent().expect("target/debug dir");
-    let candidate = target_debug.join("ollama-stack-gui");
+    let candidate = target_debug.join("selfllama-gui");
     assert!(
         candidate.is_file(),
-        "expected the ollama-stack-gui binary at {} (built alongside this test binary by `cargo test`)",
+        "expected the selfllama-gui binary at {} (built alongside this test binary by `cargo test`)",
         candidate.display()
     );
     candidate

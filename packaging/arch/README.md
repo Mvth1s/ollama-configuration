@@ -66,6 +66,12 @@ of writing) — there is no `-git`/VCS variant. On a new release:
 2. Update `sha256sums` — `updpkgsums` (from `pacman-contrib`) does this automatically, or
    compute it by hand: `curl -sL https://github.com/Mvth1s/ollama-configuration/archive/refs/tags/vX.Y.Z.tar.gz | sha256sum`.
 3. Reset `pkgrel` to `1`.
+4. **One-time, only for the first release that includes the SelfLlama rename** (`gui/src-tauri`'s
+   and `launcher/src-tauri`'s crate/binary/productName renames — see the repo-root `CLAUDE.md`):
+   apply the "DEFERRED RENAME" comment block already sitting above each `PKGBUILD`'s `build()`
+   (`pkgname`, the install paths, the resource-dir path, `.desktop` `Name=`/`Exec=`) at the same
+   time as steps 1-3 above, then delete that comment block — it only exists to prevent applying
+   the rename to a `PKGBUILD` that still builds a pre-rename tag, which would break the build.
 
 ## Known limitation
 

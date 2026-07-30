@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Ollama Launcher",
+  "productName": "SelfLlama Launcher",
   "version": "0.1.0",
-  "identifier": "com.ollamastack.launcher",
+  "identifier": "com.selfllama.launcher",
   "build": {
     "frontendDist": "../dist"
   },
@@ -10,7 +10,7 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "Ollama Launcher",
+        "title": "SelfLlama Launcher",
         "width": 480,
         "height": 640,
         "minWidth": 380,

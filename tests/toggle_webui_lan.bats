@@ -33,7 +33,7 @@ teardown() {
 @test "on: writes WEBUI_HOST=0.0.0.0 and warns, without a unit installed" {
   run "$REPO_ROOT/scripts/linux/toggle-webui-lan.sh" on
   [ "$status" -eq 0 ]
-  grep -q '^WEBUI_HOST=0.0.0.0$' "$TEST_HOME/.config/ollama-stack/webui.env"
+  grep -q '^WEBUI_HOST=0.0.0.0$' "$TEST_HOME/.config/selfllama/webui.env"
   [[ "$output" == *"LAN access enabled"* ]]
   [[ "$output" == *"No login is required by default"* ]]
   [[ "$output" == *"not installed yet"* ]]
@@ -43,7 +43,7 @@ teardown() {
   "$REPO_ROOT/scripts/linux/toggle-webui-lan.sh" on
   run "$REPO_ROOT/scripts/linux/toggle-webui-lan.sh" off
   [ "$status" -eq 0 ]
-  grep -q '^WEBUI_HOST=127.0.0.1$' "$TEST_HOME/.config/ollama-stack/webui.env"
+  grep -q '^WEBUI_HOST=127.0.0.1$' "$TEST_HOME/.config/selfllama/webui.env"
   [[ "$output" == *"LAN access disabled"* ]]
 }
 

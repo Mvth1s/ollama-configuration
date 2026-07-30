@@ -1,5 +1,5 @@
 {
-  "name": "ollama-configuration",
+  "name": "selfllama",
   "private": true,
   "description": "Release tooling only (commitlint, husky, semantic-release) -- not a JS project, the gui/ and launcher/ frontends have no npm dependency.",
   "scripts": {

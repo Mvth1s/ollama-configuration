@@ -211,8 +211,8 @@ mod tests {
 
     #[test]
     fn env_file_plan_defaults_to_localhost_only_and_never_overwrites() {
-        let plan = webui_env_file_plan("/home/user/.config/ollama-stack");
-        assert_eq!(plan.path, "/home/user/.config/ollama-stack/webui.env");
+        let plan = webui_env_file_plan("/home/user/.config/selfllama");
+        assert_eq!(plan.path, "/home/user/.config/selfllama/webui.env");
         assert_eq!(plan.default_content, "WEBUI_HOST=127.0.0.1\n");
         assert!(plan.only_if_missing, "must never reset an existing LAN-access choice");
     }
@@ -221,13 +221,13 @@ mod tests {
 
     #[test]
     fn unit_content_keeps_webui_host_as_a_literal_placeholder_for_systemd() {
-        let content = render_unit_content("/home/user/.local/bin/open-webui", "/home/user/.config/ollama-stack/webui.env");
+        let content = render_unit_content("/home/user/.local/bin/open-webui", "/home/user/.config/selfllama/webui.env");
 
         assert!(
             content.contains("--host ${WEBUI_HOST}"),
             "WEBUI_HOST must reach the unit file unexpanded, for systemd's own EnvironmentFile= substitution at service-start time - got:\n{content}"
         );
-        assert!(content.contains("EnvironmentFile=/home/user/.config/ollama-stack/webui.env"));
+        assert!(content.contains("EnvironmentFile=/home/user/.config/selfllama/webui.env"));
         assert!(content.contains("Environment=\"OLLAMA_BASE_URL=http://127.0.0.1:11434\""));
         assert!(content.contains("Environment=\"WEBUI_AUTH=False\""));
         assert!(content.contains("ExecStart=/home/user/.local/bin/open-webui serve --port 8080 --host ${WEBUI_HOST}"));

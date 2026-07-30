@@ -23,8 +23,8 @@ stub_free_ram() {
 }
 
 seed_gpu_vendor() {
-  mkdir -p "$TEST_HOME/.config/ollama-stack"
-  printf 'GPU_VENDOR=%s\n' "\"$1\"" > "$TEST_HOME/.config/ollama-stack/state.env"
+  mkdir -p "$TEST_HOME/.config/selfllama"
+  printf 'GPU_VENDOR=%s\n' "\"$1\"" > "$TEST_HOME/.config/selfllama/state.env"
 }
 
 @test "--tier= forces the tier regardless of RAM" {
@@ -32,7 +32,7 @@ seed_gpu_vendor() {
   run "$REPO_ROOT/scripts/linux/03-pull-models.sh" --tier=M --no-tui
   [ "$status" -eq 0 ]
   [[ "$output" == *"Tier manually forced: M"* ]]
-  grep -q '^TIER=M$' "$TEST_HOME/.config/ollama-stack/state.env"
+  grep -q '^TIER=M$' "$TEST_HOME/.config/selfllama/state.env"
 }
 
 @test "auto-selects XS for <= 8GB RAM" {

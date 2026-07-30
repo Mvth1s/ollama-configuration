@@ -4,7 +4,7 @@
 // application/src-tauri already applied.
 //
 // This is also where the single-pkexec mechanism's other half lives:
-// ollama_stack_gui::run_privileged_phase (in lib.rs) re-invokes *this
+// selfllama_gui::run_privileged_phase (in lib.rs) re-invokes *this
 // binary* under pkexec with selfllama_installer::privileged::
 // RUN_PRIVILEGED_PHASE_ARG, exactly like selfllama-installer's own
 // main.rs re-invokes itself. Without the check below, that re-invocation
@@ -17,5 +17,5 @@ fn main() {
         std::process::exit(selfllama_installer::privileged::run_privileged_worker(&args[1..]));
     }
 
-    ollama_stack_gui::run_tauri_app();
+    selfllama_gui::run_tauri_app();
 }

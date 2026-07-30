@@ -1,12 +1,12 @@
 [package]
-name = "ollama-stack-gui"
+name = "selfllama-gui"
 version = "0.1.0"
-description = "GUI orchestrator for the ollama-configuration install scripts"
+description = "GUI orchestrator for the SelfLlama install scripts"
 edition = "2021"
 rust-version = "1.77"
 
 [lib]
-name = "ollama_stack_gui"
+name = "selfllama_gui"
 path = "src/lib.rs"
 
 [build-dependencies]
@@ -34,5 +34,5 @@ selfllama-installer = { path = "../../application/src-tauri" }
 libc = "0.2"
 
 [[bin]]
-name = "ollama-stack-gui"
+name = "selfllama-gui"
 path = "src/main.rs"

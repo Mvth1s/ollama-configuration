@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Ollama Configuration</title>
+<title>SelfLlama</title>
 <meta name="description" content="Installe et configure un stack Ollama + Open WebUI 100% local, sur Linux ou Windows, avec détection automatique du GPU et de la RAM." />
 <!--
   SEO/GEO note: the canonical/og:url/sitemap URLs below all point at
@@ -15,15 +15,15 @@
 -->
 <link rel="canonical" href="https://ollama-configuration.vercel.app/" />
 <meta property="og:type" content="website" />
-<meta property="og:site_name" content="Ollama Configuration" />
+<meta property="og:site_name" content="SelfLlama" />
 <meta property="og:locale" content="fr_FR" />
-<meta property="og:title" content="Ollama Configuration — Ton IA locale, configurée en une commande" />
+<meta property="og:title" content="SelfLlama — Ton IA locale, configurée en une commande" />
 <meta property="og:description" content="Installe et configure un stack Ollama + Open WebUI 100% local, sur Linux ou Windows, avec détection automatique du GPU et de la RAM." />
 <meta property="og:url" content="https://ollama-configuration.vercel.app/" />
 <meta property="og:image" content="https://ollama-configuration.vercel.app/screenshots/gui-detection.png" />
-<meta property="og:image:alt" content="Assistant d'installation Ollama Configuration, écran de détection du matériel" />
+<meta property="og:image:alt" content="Assistant d'installation SelfLlama, écran de détection du matériel" />
 <meta name="twitter:card" content="summary_large_image" />
-<meta name="twitter:title" content="Ollama Configuration — Ton IA locale, configurée en une commande" />
+<meta name="twitter:title" content="SelfLlama — Ton IA locale, configurée en une commande" />
 <meta name="twitter:description" content="Installe et configure un stack Ollama + Open WebUI 100% local, sur Linux ou Windows, avec détection automatique du GPU et de la RAM." />
 <meta name="twitter:image" content="https://ollama-configuration.vercel.app/screenshots/gui-detection.png" />
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%A6%99%3C/text%3E%3C/svg%3E" />
@@ -34,7 +34,7 @@
 {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
-  "name": "Ollama Configuration",
+  "name": "SelfLlama",
   "description": "Installe et configure un stack Ollama + Open WebUI 100% local, sur Linux ou Windows, avec détection automatique du GPU et de la RAM.",
   "url": "https://ollama-configuration.vercel.app/",
   "downloadUrl": "https://github.com/Mvth1s/ollama-configuration/releases",
@@ -211,7 +211,7 @@
   <header class="nav">
     <div class="brand">
       <span class="brand-mark">🦙</span>
-      Ollama Configuration
+      SelfLlama
     </div>
     <nav class="nav-links">
       <a href="#screenshots">Aperçu</a>
@@ -239,11 +239,11 @@
   <section class="shots" id="screenshots">
     <div class="shot-row">
       <figure>
-        <img src="screenshots/gui-detection.png" alt="Assistant d'installation Ollama Configuration, écran de détection du matériel" loading="lazy" />
+        <img src="screenshots/gui-detection.png" alt="Assistant d'installation SelfLlama, écran de détection du matériel" loading="lazy" />
         <figcaption><b>Assistant d'installation</b> — détection réelle du GPU, du CPU, de la RAM et de la distribution avant de choisir un tier de modèles.</figcaption>
       </figure>
       <figure>
-        <img src="screenshots/launcher.png" alt="Ollama Launcher, gestion du service et de l'accès réseau" loading="lazy" />
+        <img src="screenshots/launcher.png" alt="SelfLlama Launcher, gestion du service et de l'accès réseau" loading="lazy" />
         <figcaption><b>Launcher</b> — démarre/arrête Open WebUI, partage l'accès réseau local par QR code, gère les modèles installés.</figcaption>
       </figure>
     </div>
@@ -309,7 +309,7 @@
         <div class="dl-card-head">
           <div class="ic">🎛️</div>
           <div>
-            <h3>Ollama Stack GUI</h3>
+            <h3>SelfLlama Installer</h3>
             <p>Assistant d'installation, une seule fois.</p>
           </div>
         </div>
@@ -328,7 +328,7 @@
         <div class="dl-card-head">
           <div class="ic">🚀</div>
           <div>
-            <h3>Ollama Launcher</h3>
+            <h3>SelfLlama Launcher</h3>
             <p>Usage quotidien : Open WebUI et les modèles.</p>
           </div>
         </div>
@@ -372,14 +372,19 @@
 <script>
 (function () {
   const APPS = [
-    { key: 'gui', prefix: 'ollama-gui-' },
-    { key: 'launcher', prefix: 'ollama-launcher-' }
+    { key: 'gui', prefix: 'selfllama-gui-' },
+    { key: 'launcher', prefix: 'selfllama-launcher-' }
   ];
   // Extensions only, not full filenames: asset names are
-  // ollama-<app>-<version>-<platform>-<arch>.<ext> (build-desktop.yml's
+  // selfllama-<app>-<version>-<platform>-<arch>.<ext> (build-desktop.yml's
   // releaseAssetNamePattern), and the version now tracks the release tag -
   // but matching by prefix + extension stays robust regardless, so this
-  // doesn't need updating if that ever changes again.
+  // doesn't need updating if that ever changes again. Note: this prefix
+  // changed from "ollama-" to "selfllama-" as part of the SelfLlama rename -
+  // until a new release is actually published under the new prefix, the
+  // live site's "latest release" lookup won't find a match and correctly
+  // falls back to the pending/Releases-page state (see below), same as any
+  // other not-yet-published asset.
   const FORMATS = [
     { ext: '.deb', label: '.deb', platform: 'linux' },
     { ext: '.rpm', label: '.rpm', platform: 'linux' },

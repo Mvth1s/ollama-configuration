@@ -1,4 +1,4 @@
-# ollama-configuration
+# SelfLlama
 
 Run your own private AI assistant, entirely on your own computer — no subscription, no cloud, no data ever leaving your machine. This project installs and configures everything for you: [Ollama](https://ollama.com) to run the AI models, and [Open WebUI](https://github.com/open-webui/open-webui) as a ChatGPT-style chat interface, with models automatically chosen to fit your computer's hardware.
 
@@ -12,7 +12,7 @@ It works on both Linux and Windows, either through a graphical installer (no ter
 <td width="50%"><img src="docs/screenshots/gui-models.png" alt="Installer assistant, model selection step" width="100%"/><br/><sub><b>Model selection</b> — one model per use case (text, code, reasoning, embeddings), auto-picked, changeable.</sub></td>
 </tr>
 <tr>
-<td colspan="2"><img src="docs/screenshots/launcher.png" alt="Ollama Launcher managing the Open WebUI service and network access" width="100%"/><br/><sub><b>Launcher</b> — day-to-day companion app: start/stop Open WebUI, manage installed models, share network access via a QR code.</sub></td>
+<td colspan="2"><img src="docs/screenshots/launcher.png" alt="SelfLlama Launcher managing the Open WebUI service and network access" width="100%"/><br/><sub><b>Launcher</b> — day-to-day companion app: start/stop Open WebUI, manage installed models, share network access via a QR code.</sub></td>
 </tr>
 </table>
 
@@ -22,7 +22,7 @@ The simplest way to get started is the desktop app: download the installer for y
 
 - **[Download the installer](https://github.com/Mvth1s/ollama-configuration/releases)** for your platform and format (`.deb`/`.rpm`/`.AppImage` on Linux, `.msi`/`.exe` on Windows), or browse them visually on the **[showcase site](https://ollama-configuration.vercel.app/#download)**.
 - **Arch Linux**: build a native package instead of using the `.AppImage` — see [`packaging/arch/README.md`](packaging/arch/README.md). This links against your system's own `webkit2gtk`/`gtk3` rather than the copies bundled in the AppImage, which have been reported to crash on launch on at least one Arch-based system with an AMD GPU.
-- Once installed, [`launcher/`](launcher/README.md) (Ollama Launcher) is the app you'll actually use day-to-day afterwards: open the chat interface, start/stop the service, manage models, and share access on your local network.
+- Once installed, [`launcher/`](launcher/README.md) (SelfLlama Launcher) is the app you'll actually use day-to-day afterwards: open the chat interface, start/stop the service, manage models, and share access on your local network.
 
 Prefer the command line, or want more control over each step? See [Quick start (command line)](#quick-start-command-line) below — everything the desktop app does is just a thin wrapper around the same scripts.
 

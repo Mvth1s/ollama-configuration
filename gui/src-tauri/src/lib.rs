@@ -337,7 +337,7 @@ mod tests {
 
     #[test]
     fn finds_marker_in_starting_directory() {
-        let tmp = std::env::temp_dir().join(format!("ollama-stack-test-{}", std::process::id()));
+        let tmp = std::env::temp_dir().join(format!("selfllama-test-{}", std::process::id()));
         std::fs::create_dir_all(&tmp).unwrap();
         std::fs::write(tmp.join("setup.sh"), "").unwrap();
 
@@ -349,7 +349,7 @@ mod tests {
 
     #[test]
     fn finds_marker_several_levels_up() {
-        let base = std::env::temp_dir().join(format!("ollama-stack-test-nested-{}", std::process::id()));
+        let base = std::env::temp_dir().join(format!("selfllama-test-nested-{}", std::process::id()));
         let nested = base.join("gui/src-tauri/target/debug");
         std::fs::create_dir_all(&nested).unwrap();
         std::fs::write(base.join("setup.sh"), "").unwrap();
@@ -362,7 +362,7 @@ mod tests {
 
     #[test]
     fn errors_when_marker_is_never_found() {
-        let tmp = std::env::temp_dir().join(format!("ollama-stack-test-missing-{}", std::process::id()));
+        let tmp = std::env::temp_dir().join(format!("selfllama-test-missing-{}", std::process::id()));
         std::fs::create_dir_all(&tmp).unwrap();
 
         let result = find_marker_upwards(&tmp, "setup.sh");
