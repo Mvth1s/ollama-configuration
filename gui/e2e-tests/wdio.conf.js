@@ -39,6 +39,14 @@ export const config = {
           '../src-tauri/target/debug',
           isWindows ? 'selfllama-gui.exe' : 'selfllama-gui'
         ),
+        // tauri-driver serializes this straight into ms:edgeOptions for
+        // msedgedriver on Windows; omitting it entirely has been reported
+        // to break session creation there (tauri-apps/tauri#12381 - a
+        // different specific error message than what this repo's own
+        // e2e-windows CI hit, but the same layer of the stack: tauri-driver
+        // -> msedgedriver capability negotiation). Harmless on Linux, where
+        // WebKitWebDriver ignores it.
+        webviewOptions: {},
       },
     },
   ],

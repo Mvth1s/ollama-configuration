@@ -36,6 +36,11 @@ export const config = {
           '../src-tauri/target/debug',
           isWindows ? 'selfllama-launcher.exe' : 'selfllama-launcher'
         ),
+        // See gui/e2e-tests/wdio.conf.js's own note (this file mirrors
+        // it): tauri-driver serializes this into ms:edgeOptions for
+        // msedgedriver on Windows, and omitting it has been reported to
+        // break session creation there.
+        webviewOptions: {},
       },
     },
   ],
