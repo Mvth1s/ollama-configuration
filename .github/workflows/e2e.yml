@@ -3,23 +3,20 @@ name: E2E (WebDriver)
 # gui/dist and launcher/dist previously had no end-to-end coverage at all -
 # only pure Rust functions extracted out of their #[tauri::command]s were
 # unit-tested (see CLAUDE.md's Tests section). This drives the REAL built
-# app windows through tauri-driver/WebKitWebDriver via WebdriverIO, the same
-# way Tauri's own docs recommend:
+# app windows through tauri-driver via WebdriverIO, the same way Tauri's own
+# docs recommend:
 # https://v2.tauri.app/develop/tests/webdriver/example/webdriverio/
 #
-# Linux only for now (WebKitWebDriver has no Windows equivalent - Tauri's
-# own CI example uses msedgedriver-tool for that, out of scope here since
-# scripts/windows/setup.ps1/the Windows side of gui/launcher aren't touched by these specs).
-#
-# Called from ci.yml (workflow_call), gated on lint.yml/test.yml succeeding
-# first since this is the single most expensive job in the pipeline;
-# workflow_dispatch kept for a standalone manual run.
+# e2e-linux drives WebKitWebDriver, e2e-windows drives msedgedriver - see
+# each job below. Called from ci.yml (workflow_call), gated on
+# lint.yml/test.yml succeeding first since this is the single most expensive
+# part of the pipeline; workflow_dispatch kept for a standalone manual run.
 on:
   workflow_call:
   workflow_dispatch:
 
 jobs:
-  e2e:
+  e2e-linux:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -63,3 +60,70 @@ jobs:
       - name: Run WebDriver e2e tests
         working-directory: ${{ matrix.app }}/e2e-tests
         run: xvfb-run --auto-servernum npm test
+
+  # UNVERIFIED as of the change that added this job - no Windows machine/VM
+  # was available to run it before merging, only Tauri's own documented
+  # Windows WebDriver setup to go on (see the URL in this file's own header
+  # comment, and https://github.com/tauri-apps/tauri/tree/dev/examples/api,
+  # whose CI downloads a matching msedgedriver the same way). If this job
+  # fails on its first real run, the msedgedriver-matching step below is the
+  # most likely culprit (Program Files path, or the exact Edge channel
+  # windows-latest ships) - not the app/wdio.conf.js side, which mirrors the
+  # already-proven Linux job as closely as msedgedriver's own constraints
+  # allow (see gui/e2e-tests/wdio.conf.js's own note on this).
+  e2e-windows:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [gui, launcher]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "${{ matrix.app }}/src-tauri -> target"
+
+      - name: Install tauri-driver
+        run: cargo install tauri-driver --locked
+
+      # windows-latest runners ship Microsoft Edge preinstalled, but
+      # tauri-driver needs a msedgedriver.exe matching that exact Edge
+      # version passed via --native-driver (no WebKitWebDriver-style
+      # PATH auto-discovery on Windows). Reads the installed Edge's own
+      # ProductVersion and downloads the matching driver build.
+      - name: Download the msedgedriver matching this runner's Edge version
+        shell: pwsh
+        run: |
+          $edgePath = "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe"
+          if (-not (Test-Path $edgePath)) {
+            $edgePath = "$env:ProgramFiles\Microsoft\Edge\Application\msedge.exe"
+          }
+          $edgeVersion = (Get-Item $edgePath).VersionInfo.ProductVersion
+          Write-Host "Detected Microsoft Edge version: $edgeVersion"
+          $zipPath = Join-Path $env:RUNNER_TEMP 'edgedriver.zip'
+          $destDir = Join-Path $env:RUNNER_TEMP 'edgedriver'
+          Invoke-WebRequest -Uri "https://msedgedriver.azureedge.net/$edgeVersion/edgedriver_win64.zip" -OutFile $zipPath
+          Expand-Archive -Path $zipPath -DestinationPath $destDir
+          $driverPath = Join-Path $destDir 'msedgedriver.exe'
+          "TAURI_DRIVER_NATIVE_DRIVER=$driverPath" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: 'npm'
+          cache-dependency-path: ${{ matrix.app }}/e2e-tests/package-lock.json
+
+      - name: npm install
+        working-directory: ${{ matrix.app }}/e2e-tests
+        run: npm install
+
+      # onPrepare in wdio.conf.js builds the app itself, same as e2e-linux.
+      # No xvfb-run equivalent needed: unlike WebKitWebDriver, msedgedriver
+      # drives a real (non-headless) Edge-based webview window directly on
+      # the runner's desktop session.
+      - name: Run WebDriver e2e tests
+        working-directory: ${{ matrix.app }}/e2e-tests
+        run: npm test
