@@ -107,7 +107,11 @@ impl From<DetectResultRaw> for DetectResult {
 // Unlike run_step/stream_child (used for the real install, which streams
 // output live to the frontend as events), detection is a single fast
 // read-only call whose result is needed synchronously, so plain
-// Command::output() is enough here.
+// Command::output() is enough here. Windows-only since Phase (detect_linux
+// rewiring): the Linux path now calls selfllama_core directly against real
+// command output rather than parsing a script's __DETECT__ JSON line, so
+// this stays only for detect_windows below.
+#[cfg(target_os = "windows")]
 fn run_capture(cmd: &mut Command) -> Result<String, String> {
     let output = cmd
         .stdin(Stdio::null())
@@ -123,6 +127,13 @@ fn run_capture(cmd: &mut Command) -> Result<String, String> {
 // Scripts print detection data as a single line prefixed with __DETECT__
 // (see 02-configure-gpu.sh/03-pull-models.sh/setup.ps1), so it can't be
 // confused with the human-readable log_info/Log-Info lines printed before it.
+// Not Windows-gated like run_capture above: still meaningfully tested
+// cross-platform (see extracts_detect_json_ignoring_human_readable_log_lines
+// below) even though only detect_windows calls it in the real (non-test)
+// code path now - the allow(dead_code) below only silences the resulting
+// "unused in production code" warning on non-Windows targets, it doesn't
+// affect whether the tests below actually exercise this function.
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
 fn extract_detect_json(output: &str) -> Result<serde_json::Value, String> {
     for line in output.lines() {
         if let Some(json_str) = line.strip_prefix("__DETECT__") {
@@ -133,30 +144,75 @@ fn extract_detect_json(output: &str) -> Result<serde_json::Value, String> {
     Err("no detection output (__DETECT__ line) found in script output".into())
 }
 
-// Linux detection is split across two scripts (GPU/distro/CPU from
-// 02-configure-gpu.sh, RAM/tier/models/candidates from 03-pull-models.sh),
-// each already read-only and reusable as-is; their JSON objects are merged
-// into one before deserializing into DetectResult.
+// Linux detection used to shell out to `02-configure-gpu.sh --detect-only`
+// / `03-pull-models.sh --detect-only` and merge their two __DETECT__ JSON
+// lines, the same as detect_windows below still does. Now that
+// selfllama_core::detect/install::tier hold every piece of logic those two
+// invocations needed (GPU vendor from `lspci`, distro from
+// `/etc/os-release`, CPU/RAM from `/proc/cpuinfo`+`nproc`/`free`, tier
+// selection and the model tables), this calls those pure functions
+// directly against real command output gathered here - no script process,
+// no __DETECT__ line, no JSON round trip. Detection never needs the
+// AMD `rocminfo`/gfx-code lookup 02-configure-gpu.sh also does: that only
+// feeds the HSA_OVERRIDE_GFX_VERSION install-time decision
+// (core::install::gpu), which DetectResult has no field for anyway.
+//
+// Windows keeps shelling out to `setup.ps1 -DetectOnly` (see detect_windows
+// below) - GPU vendor there needs a CIM `Win32_VideoController` query, which
+// has no equivalent pure-Rust path in this crate graph without a new WMI
+// dependency, so rewiring that side is left for a later phase.
 #[cfg(not(target_os = "windows"))]
-fn detect_linux(repo_root: &Path, tier: &Option<String>) -> Result<DetectResult, String> {
-    let mut gpu_cmd = Command::new(repo_root.join("02-configure-gpu.sh"));
-    gpu_cmd.current_dir(repo_root).args(["--detect-only", "--no-tui"]);
-    let gpu_json = extract_detect_json(&run_capture(&mut gpu_cmd)?)?;
+fn run_capture_lossy(cmd: &mut Command) -> String {
+    cmd.stdin(Stdio::null())
+        .output()
+        .map(|o| String::from_utf8_lossy(&o.stdout).into_owned())
+        .unwrap_or_default()
+}
 
-    let mut models_cmd = Command::new(repo_root.join("03-pull-models.sh"));
-    models_cmd.current_dir(repo_root).args(["--detect-only", "--no-tui"]);
-    if let Some(t) = tier {
-        models_cmd.arg(format!("--tier={t}"));
-    }
-    let models_json = extract_detect_json(&run_capture(&mut models_cmd)?)?;
+#[cfg(not(target_os = "windows"))]
+fn detect_linux(_repo_root: &Path, tier: &Option<String>) -> Result<DetectResult, String> {
+    let mut lspci_cmd = Command::new("lspci");
+    lspci_cmd.arg("-nnk");
+    let lspci_output = run_capture_lossy(&mut lspci_cmd);
+    let gpu = selfllama_core::detect::gpu::parse_gpu_from_lspci(&lspci_output);
 
-    let mut merged = gpu_json.as_object().cloned().unwrap_or_default();
-    if let Some(obj) = models_json.as_object() {
-        merged.extend(obj.clone());
-    }
-    let raw: DetectResultRaw = serde_json::from_value(serde_json::Value::Object(merged))
-        .map_err(|e| format!("failed to assemble detection result: {e}"))?;
-    Ok(raw.into())
+    let os_release = std::fs::read_to_string("/etc/os-release").ok();
+    let distro = selfllama_core::detect::distro::parse_distro(os_release.as_deref());
+
+    let cpuinfo = std::fs::read_to_string("/proc/cpuinfo").unwrap_or_default();
+    let cpu_model = selfllama_core::detect::cpu::parse_cpu_model(&cpuinfo);
+    let cpu_threads = selfllama_core::detect::cpu::parse_cpu_threads(&run_capture_lossy(&mut Command::new("nproc")));
+
+    let mut free_g_cmd = Command::new("free");
+    free_g_cmd.arg("-g");
+    let free_g = run_capture_lossy(&mut free_g_cmd);
+    let mut free_m_cmd = Command::new("free");
+    free_m_cmd.arg("-m");
+    let free_m = run_capture_lossy(&mut free_m_cmd);
+    let ram_gb = selfllama_core::detect::ram::compute_ram_gb(&free_g, &free_m);
+
+    let resolved_tier = selfllama_core::install::tier::compute_tier(ram_gb, &gpu.vendor, tier.as_deref());
+    let tier_models = selfllama_core::install::tier::default_models(&resolved_tier)
+        .ok_or_else(|| format!("no default models for tier {resolved_tier}"))?;
+    let candidates = selfllama_core::install::tier::candidates(&resolved_tier)
+        .ok_or_else(|| format!("no candidates for tier {resolved_tier}"))?
+        .into_iter()
+        .map(|(usage, cands)| {
+            (usage, cands.into_iter().map(|c| ModelCandidate { model: c.model, desc: c.desc }).collect())
+        })
+        .collect();
+
+    Ok(DetectResult {
+        distro_pretty: distro.pretty,
+        gpu_vendor: gpu.vendor,
+        gpu_name: gpu.name,
+        cpu_model,
+        cpu_threads,
+        ram_gb,
+        tier: resolved_tier,
+        tier_models,
+        candidates,
+    })
 }
 
 // Windows detection needs no elevation (Get-RamGb/Get-GpuVendor/Get-CpuInfo
@@ -411,6 +467,43 @@ mod tests {
         assert_eq!(result.candidates["texte"][0].model, "llama3.1:8b");
     }
 
+    // Validates the native detect_linux (selfllama_core-backed, no script
+    // process spawned) against this session's own real dev machine (Intel
+    // Iris Xe iGPU, Pop!_OS 24.04) - #[ignore] like
+    // application/core/tests/real_machine_comparison.rs, since it depends
+    // on real hardware/lspci/free output rather than being safe to run
+    // unconditionally in CI. Run with:
+    //   cargo test --lib -- --ignored --nocapture native_linux_detection_matches_the_scripts_real_output
+    //
+    // Expected values captured by running the OLD script-based path on this
+    // exact machine right before this test was written:
+    //   02-configure-gpu.sh --detect-only --no-tui:
+    //     {"distro_pretty":"Pop!_OS 24.04 LTS","gpu_vendor":"intel",
+    //      "gpu_name":"Intel Corporation TigerLake-LP GT2 [Iris Xe Graphics]
+    //      [8086:9a49] (rev 01)",
+    //      "cpu_model":"11th Gen Intel(R) Core(TM) i5-1145G7 @ 2.60GHz",
+    //      "cpu_threads":8}
+    //   03-pull-models.sh --detect-only --no-tui:
+    //     {"ram_gb":15,"tier":"S","tier_models":{"texte":"llama3.1:8b", ...}}
+    #[cfg(not(target_os = "windows"))]
+    #[test]
+    #[ignore]
+    fn native_linux_detection_matches_the_scripts_real_output() {
+        let result = detect_linux(Path::new("."), &None).expect("native detection failed");
+        println!("{result:#?}");
+
+        assert_eq!(result.distro_pretty, "Pop!_OS 24.04 LTS");
+        assert_eq!(result.gpu_vendor, "intel");
+        assert!(result.gpu_name.contains("Iris Xe Graphics"));
+        assert_eq!(result.cpu_threads, 8);
+        assert_eq!(result.ram_gb, 15);
+        assert_eq!(result.tier, "S");
+        assert_eq!(result.tier_models["texte"], "llama3.1:8b");
+        assert_eq!(result.tier_models["code"], "qwen2.5-coder:7b");
+        assert_eq!(result.tier_models["reflexion"], "deepseek-r1:7b");
+        assert_eq!(result.tier_models["embeddings"], "nomic-embed-text");
+        assert_eq!(result.candidates["texte"][0].model, "llama3.1:8b");
+    }
 }
 
 fn emit_log(app: &AppHandle, stream: &str, text: String) {

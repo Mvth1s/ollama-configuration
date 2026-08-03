@@ -18,6 +18,7 @@
 
 pub mod gpu;
 pub mod ollama;
+pub mod tier;
 pub mod webui;
 
 /// Package-manager family, as already determined by
