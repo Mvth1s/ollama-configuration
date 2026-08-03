@@ -258,7 +258,7 @@ fn get_lan_url() -> Result<String, String> {
 
 // Open WebUI's own `serve` command has no environment variable for its bind
 // address, only a --host CLI flag, so toggling LAN access means touching
-// whatever actually drives that flag: the small $HOME/.config/ollama-stack/
+// whatever actually drives that flag: the small $HOME/.config/selfllama/
 // webui.env file 04-install-webui.sh's systemd unit reads via
 // EnvironmentFile= on Linux, and the 'OpenWebUI' scheduled task's own
 // -Argument string on Windows (rebuilt via powershell.exe, mirroring
@@ -268,10 +268,27 @@ fn get_lan_url() -> Result<String, String> {
 // shelled out to, since the launcher is meant to keep working as a
 // standalone packaged binary without the repo scripts nearby.
 
+// Pre-rename (ollama-configuration) location of the same directory -
+// migrated wholesale the first time this (or any script sourcing
+// lib/common.sh) touches the state dir, same reasoning as
+// lib/common.sh's migrate_legacy_state_dir. The launcher can be opened
+// without ever re-running setup.sh after an upgrade, so it needs this
+// fallback itself rather than relying on the Bash scripts to have already
+// migrated it.
+#[cfg(not(target_os = "windows"))]
+fn state_dir() -> PathBuf {
+    let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".into());
+    let new_dir = PathBuf::from(&home).join(".config/selfllama");
+    let legacy_dir = PathBuf::from(&home).join(".config/ollama-stack");
+    if !new_dir.exists() && legacy_dir.is_dir() {
+        let _ = std::fs::rename(&legacy_dir, &new_dir);
+    }
+    new_dir
+}
+
 #[cfg(not(target_os = "windows"))]
 fn webui_env_path() -> PathBuf {
-    let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".into());
-    PathBuf::from(home).join(".config/ollama-stack/webui.env")
+    state_dir().join("webui.env")
 }
 
 #[cfg(not(target_os = "windows"))]
@@ -347,7 +364,12 @@ fn set_webui_lan(enabled: bool) -> Result<String, String> {
     let host = if enabled { "0.0.0.0" } else { "127.0.0.1" };
     let script = format!(
         r#"
-$StateDir = Join-Path $env:APPDATA 'ollama-stack'
+$StateDir = Join-Path $env:APPDATA 'selfllama'
+$LegacyStateDir = Join-Path $env:APPDATA 'ollama-stack'
+if (-not (Test-Path $StateDir) -and (Test-Path $LegacyStateDir)) {{
+    New-Item -ItemType Directory -Path (Split-Path $StateDir -Parent) -Force | Out-Null
+    Move-Item -Path $LegacyStateDir -Destination $StateDir
+}}
 $StateFile = Join-Path $StateDir 'state.env'
 New-Item -ItemType Directory -Path $StateDir -Force | Out-Null
 $existing = @()

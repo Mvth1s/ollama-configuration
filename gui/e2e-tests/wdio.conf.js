@@ -23,7 +23,7 @@ export const config = {
     {
       maxInstances: 1,
       'tauri:options': {
-        application: path.resolve(__dirname, '../src-tauri/target/debug/ollama-stack-gui'),
+        application: path.resolve(__dirname, '../src-tauri/target/debug/selfllama-gui'),
       },
     },
   ],

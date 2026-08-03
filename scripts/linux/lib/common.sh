@@ -6,18 +6,39 @@
 # Provides:
 #   - logging helpers (log_info, log_ok, log_warn, log_err)
 #   - distro detection + package manager wrapper
-#   - a small shared state system between scripts (~/.config/ollama-stack)
+#   - a small shared state system between scripts (~/.config/selfllama)
 #     so each script can run standalone or chained after the others
 #     without re-detecting everything each time.
 # =============================================================================
 
-STATE_DIR="$HOME/.config/ollama-stack"
+STATE_DIR="$HOME/.config/selfllama"
 STATE_FILE="$STATE_DIR/state.env"
+# Pre-rename (ollama-configuration) location of the same directory - migrated
+# below rather than left stranded, since real installs already depend on it
+# (state.env, webui.env).
+LEGACY_STATE_DIR="$HOME/.config/ollama-stack"
 
 log_info() { printf '\033[1;34m[INFO]\033[0m %s\n' "$1"; }
 log_ok()   { printf '\033[1;32m[OK]\033[0m %s\n' "$1"; }
 log_warn() { printf '\033[1;33m[WARNING]\033[0m %s\n' "$1"; }
 log_err()  { printf '\033[1;31m[ERROR]\033[0m %s\n' "$1" >&2; }
+
+# One-time migration for installs that predate the SelfLlama rename: if the
+# new state dir doesn't exist yet but the old one does, move it wholesale
+# (state.env, webui.env, everything in it) rather than leaving an existing
+# user's saved GPU/tier/webui-host choices stranded under the old path. A
+# no-op on every run after the first, and on a fresh install (neither dir
+# exists yet, mkdir -p elsewhere handles that). If both happen to exist
+# (e.g. an old and new version run alternately), the old one is left alone
+# rather than overwriting anything already migrated.
+migrate_legacy_state_dir() {
+  if [ ! -e "$STATE_DIR" ] && [ -d "$LEGACY_STATE_DIR" ]; then
+    mkdir -p "$(dirname "$STATE_DIR")"
+    mv "$LEGACY_STATE_DIR" "$STATE_DIR"
+    log_info "Migrated existing configuration from $LEGACY_STATE_DIR to $STATE_DIR"
+  fi
+}
+migrate_legacy_state_dir
 
 # ---------------------------------------------------------------------------
 # TUI helpers (dialog, fallback whiptail). Every caller must go through

@@ -20,49 +20,49 @@ write_os_release() {
 
 @test "detect_distro: arch via ID" {
   write_os_release 'ID=arch'
-  run bash -c "source '$REPO_ROOT/lib/common.sh'; detect_distro >/dev/null; echo \"\$DISTRO_FAMILY\""
+  run bash -c "source '$REPO_ROOT/scripts/linux/lib/common.sh'; detect_distro >/dev/null; echo \"\$DISTRO_FAMILY\""
   [ "$status" -eq 0 ]
   [ "$output" = "arch" ]
 }
 
 @test "detect_distro: debian family via ID=ubuntu" {
   write_os_release 'ID=ubuntu' 'ID_LIKE=debian'
-  run bash -c "source '$REPO_ROOT/lib/common.sh'; detect_distro >/dev/null; echo \"\$DISTRO_FAMILY\""
+  run bash -c "source '$REPO_ROOT/scripts/linux/lib/common.sh'; detect_distro >/dev/null; echo \"\$DISTRO_FAMILY\""
   [ "$status" -eq 0 ]
   [ "$output" = "debian" ]
 }
 
 @test "detect_distro: fedora family via ID_LIKE=rhel fedora" {
   write_os_release 'ID=nobara' 'ID_LIKE="fedora"'
-  run bash -c "source '$REPO_ROOT/lib/common.sh'; detect_distro >/dev/null; echo \"\$DISTRO_FAMILY\""
+  run bash -c "source '$REPO_ROOT/scripts/linux/lib/common.sh'; detect_distro >/dev/null; echo \"\$DISTRO_FAMILY\""
   [ "$status" -eq 0 ]
   [ "$output" = "fedora" ]
 }
 
 @test "detect_distro: opensuse family via ID_LIKE=suse" {
   write_os_release 'ID=opensuse-tumbleweed' 'ID_LIKE="suse opensuse"'
-  run bash -c "source '$REPO_ROOT/lib/common.sh'; detect_distro >/dev/null; echo \"\$DISTRO_FAMILY\""
+  run bash -c "source '$REPO_ROOT/scripts/linux/lib/common.sh'; detect_distro >/dev/null; echo \"\$DISTRO_FAMILY\""
   [ "$status" -eq 0 ]
   [ "$output" = "opensuse" ]
 }
 
 @test "detect_distro: unknown when os-release is missing" {
   export OS_RELEASE_FILE="$TEST_HOME/does-not-exist"
-  run bash -c "source '$REPO_ROOT/lib/common.sh'; detect_distro >/dev/null; echo \"\$DISTRO_FAMILY\""
+  run bash -c "source '$REPO_ROOT/scripts/linux/lib/common.sh'; detect_distro >/dev/null; echo \"\$DISTRO_FAMILY\""
   [ "$status" -eq 0 ]
   [ "$output" = "unknown" ]
 }
 
 @test "detect_distro: does not re-detect once DISTRO_FAMILY is already set" {
   write_os_release 'ID=arch'
-  run bash -c "source '$REPO_ROOT/lib/common.sh'; DISTRO_FAMILY=debian; detect_distro >/dev/null; echo \"\$DISTRO_FAMILY\""
+  run bash -c "source '$REPO_ROOT/scripts/linux/lib/common.sh'; DISTRO_FAMILY=debian; detect_distro >/dev/null; echo \"\$DISTRO_FAMILY\""
   [ "$status" -eq 0 ]
   [ "$output" = "debian" ]
 }
 
 @test "detect_distro: retries when a stale state.env cached 'unknown'" {
   write_os_release 'ID=arch'
-  run bash -c "source '$REPO_ROOT/lib/common.sh'; DISTRO_FAMILY=unknown; detect_distro >/dev/null; echo \"\$DISTRO_FAMILY\""
+  run bash -c "source '$REPO_ROOT/scripts/linux/lib/common.sh'; DISTRO_FAMILY=unknown; detect_distro >/dev/null; echo \"\$DISTRO_FAMILY\""
   [ "$status" -eq 0 ]
   [ "$output" = "arch" ]
 }
@@ -71,7 +71,7 @@ write_os_release() {
   stub_cmd free '
     if [ "$1" = "-g" ]; then printf "              total\nMem:      16\n"; fi
   '
-  run bash -c "source '$REPO_ROOT/lib/common.sh'; detect_ram >/dev/null; echo \"\$RAM_GB\""
+  run bash -c "source '$REPO_ROOT/scripts/linux/lib/common.sh'; detect_ram >/dev/null; echo \"\$RAM_GB\""
   [ "$status" -eq 0 ]
   [ "$output" = "16" ]
 }
@@ -81,41 +81,82 @@ write_os_release() {
     if [ "$1" = "-g" ]; then printf "              total\nMem:      0\n"
     elif [ "$1" = "-m" ]; then printf "              total\nMem:      512\n"; fi
   '
-  run bash -c "source '$REPO_ROOT/lib/common.sh'; detect_ram >/dev/null; echo \"\$RAM_GB\""
+  run bash -c "source '$REPO_ROOT/scripts/linux/lib/common.sh'; detect_ram >/dev/null; echo \"\$RAM_GB\""
   [ "$status" -eq 0 ]
   [ "$output" = "1" ]
 }
 
 @test "save_state / load_state: round-trips values, including ones with spaces" {
   run bash -c "
-    source '$REPO_ROOT/lib/common.sh'
+    source '$REPO_ROOT/scripts/linux/lib/common.sh'
     FOO='bar baz'
     NUM=42
     save_state FOO NUM
   "
   [ "$status" -eq 0 ]
 
-  run bash -c "source '$REPO_ROOT/lib/common.sh'; load_state; echo \"\$FOO|\$NUM\""
+  run bash -c "source '$REPO_ROOT/scripts/linux/lib/common.sh'; load_state; echo \"\$FOO|\$NUM\""
   [ "$status" -eq 0 ]
   [ "$output" = "bar baz|42" ]
 }
 
 @test "save_state: re-saving a variable overwrites the old value, not appends" {
   run bash -c "
-    source '$REPO_ROOT/lib/common.sh'
+    source '$REPO_ROOT/scripts/linux/lib/common.sh'
     TIER=S; save_state TIER
     TIER=L; save_state TIER
     load_state
     echo \"\$TIER\"
-    [ \"\$(grep -c '^TIER=' '$TEST_HOME/.config/ollama-stack/state.env')\" -eq 1 ]
+    [ \"\$(grep -c '^TIER=' '$TEST_HOME/.config/selfllama/state.env')\" -eq 1 ]
   "
   [ "$status" -eq 0 ]
   [ "${lines[0]}" = "L" ]
 }
 
+@test "migrate_legacy_state_dir: moves an existing ollama-stack dir to selfllama wholesale" {
+  mkdir -p "$TEST_HOME/.config/ollama-stack"
+  printf 'TIER="M"\n' > "$TEST_HOME/.config/ollama-stack/state.env"
+  printf 'WEBUI_HOST=0.0.0.0\n' > "$TEST_HOME/.config/ollama-stack/webui.env"
+
+  # migrate_legacy_state_dir runs at source time, before load_state; its own
+  # log_info line lands on stdout ahead of the final echo, so check the last
+  # line rather than the whole captured $output.
+  run bash -c "source '$REPO_ROOT/scripts/linux/lib/common.sh'; load_state; echo \"\$TIER\""
+  [ "$status" -eq 0 ]
+  [ "${lines[-1]}" = "M" ]
+  [ ! -e "$TEST_HOME/.config/ollama-stack" ]
+  [ -f "$TEST_HOME/.config/selfllama/state.env" ]
+  grep -q '^WEBUI_HOST=0.0.0.0$' "$TEST_HOME/.config/selfllama/webui.env"
+}
+
+@test "migrate_legacy_state_dir: does nothing when the new dir already exists" {
+  mkdir -p "$TEST_HOME/.config/ollama-stack" "$TEST_HOME/.config/selfllama"
+  printf 'TIER="old"\n' > "$TEST_HOME/.config/ollama-stack/state.env"
+  printf 'TIER="new"\n' > "$TEST_HOME/.config/selfllama/state.env"
+
+  run bash -c "source '$REPO_ROOT/scripts/linux/lib/common.sh'; load_state; echo \"\$TIER\""
+  [ "$status" -eq 0 ]
+  [ "${lines[-1]}" = "new" ]
+  # The old directory is left untouched, not merged or deleted.
+  [ -d "$TEST_HOME/.config/ollama-stack" ]
+}
+
+@test "migrate_legacy_state_dir: a fresh install with neither directory is a no-op" {
+  # Deliberately does not call load_state here: load_state itself does an
+  # unconditional mkdir -p "$STATE_DIR" regardless of migration (pre-existing
+  # behavior, unrelated to this rename) - this test is only about
+  # migrate_legacy_state_dir itself not fabricating a directory out of
+  # nothing, so it stops right after sourcing common.sh.
+  run bash -c "source '$REPO_ROOT/scripts/linux/lib/common.sh'; echo ok"
+  [ "$status" -eq 0 ]
+  [ "${lines[-1]}" = "ok" ]
+  [ ! -e "$TEST_HOME/.config/ollama-stack" ]
+  [ ! -e "$TEST_HOME/.config/selfllama" ]
+}
+
 @test "detect_tui: NO_TUI=1 forces backend 'none' even if a TUI tool exists" {
   stub_cmd dialog 'exit 0'
-  run bash -c "source '$REPO_ROOT/lib/common.sh'; NO_TUI=1; detect_tui; echo \"\$TUI_BACKEND\"; tui_available && echo available || echo unavailable"
+  run bash -c "source '$REPO_ROOT/scripts/linux/lib/common.sh'; NO_TUI=1; detect_tui; echo \"\$TUI_BACKEND\"; tui_available && echo available || echo unavailable"
   [ "$status" -eq 0 ]
   [ "${lines[0]}" = "none" ]
   [ "${lines[1]}" = "unavailable" ]

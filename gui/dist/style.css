@@ -566,6 +566,20 @@ main {
   transition: width 0.28s ease;
 }
 
+/* Static status line for a known-silent package-manager phase
+   (pacman/dnf/zypper - see CLAUDE.md's Phase 2 investigation). Deliberately
+   plain text, no spinner tied to a percentage and no fabricated progress -
+   just says that the current silence is expected, not stalled. */
+.install-silent-status {
+  margin: 0 0 10px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--acc-bg);
+  color: var(--acc-ink);
+  font-size: 13px;
+  font-weight: 500;
+}
+
 .install-log {
   background: var(--card-alt);
   border: 1px solid var(--border);

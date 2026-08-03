@@ -49,6 +49,7 @@ const modelsFooterEl = el('models-footer');
 const installLabelEl = el('install-label');
 const installPctEl = el('install-pct');
 const progressFillEl = el('progress-fill');
+const installSilentStatusEl = el('install-silent-status');
 const installLogEl = el('install-log');
 const doneSubtitleEl = el('done-subtitle');
 const summaryEl = el('summary');
@@ -333,8 +334,14 @@ function appendLog(stream, text) {
   installLogEl.scrollTop = installLogEl.scrollHeight;
 }
 
-async function startInstall() {
+// confirmNvidiaDriverInstall: true only on the deliberate re-run fired
+// from the install-confirmation-needed handler below, once the user has
+// really answered a real confirm() dialog - never set on a normal run, so
+// installing an Nvidia driver always needs a real "yes" first, never an
+// assumed one.
+async function startInstall({ confirmNvidiaDriverInstall = false } = {}) {
   installLogEl.textContent = '';
+  installSilentStatusEl.classList.add('hidden');
   state.installSteps = new Map();
   state.installDone = null;
   renderProgress();
@@ -344,6 +351,7 @@ async function startInstall() {
     skipModels: state.skipModels,
     skipWebui: state.skipWebui,
     models: state.skipModels ? null : state.models,
+    confirmNvidiaDriverInstall,
   };
 
   try {
@@ -357,11 +365,29 @@ async function startInstall() {
 
 listen('install-log', (event) => {
   appendLog(event.payload.stream, event.payload.text);
+  // A real output line is exactly the signal that a known-silent phase
+  // (pacman/dnf/zypper) isn't silent anymore right now - clear the static
+  // status immediately rather than waiting for the step's own next
+  // transition event.
+  installSilentStatusEl.classList.add('hidden');
 });
 
+// status is one of: pending | running | running-silent | done | failed |
+// skipped | needs-confirmation. "running-silent" (see CLAUDE.md's
+// application::privileged section) means the step is still genuinely
+// running, but the command it's currently waiting on (pacman/dnf/zypper) is
+// known to print nothing for a long stretch - message is a static status
+// line for that case only, never a percentage or any other fabricated
+// progress figure.
 listen('install-step', (event) => {
-  const { id, label, status } = event.payload;
+  const { id, label, status, message } = event.payload;
   state.installSteps.set(id, { label, status });
+  if (status === 'running-silent' && message) {
+    installSilentStatusEl.textContent = message;
+    installSilentStatusEl.classList.remove('hidden');
+  } else {
+    installSilentStatusEl.classList.add('hidden');
+  }
   if (state.step === 3) renderProgress();
 });
 
@@ -376,6 +402,27 @@ listen('install-done', (event) => {
   } else {
     renderProgress();
     backBtn.classList.remove('hidden');
+  }
+});
+
+// Fired instead of install-done when core::install::gpu::NvidiaPlan's
+// driver-install needs a real decision (see CLAUDE.md's
+// application::privileged section) - resolved here with a real confirm()
+// dialog, the same UX pattern launcher/'s model-deletion confirmation
+// already uses for irreversible/consequential actions, never assumed
+// silently one way or the other. Accepting re-runs the whole install with
+// confirmNvidiaDriverInstall: true (a second, deliberate privileged phase,
+// this time actually installing the driver); declining stops here, shown
+// the same way a real failure would be.
+listen('install-confirmation-needed', (event) => {
+  const { promptTitle, promptMessage, actionDescription } = event.payload;
+  const accepted = window.confirm(`${promptTitle}\n\n${promptMessage}\n\n${actionDescription}`);
+  if (accepted) {
+    startInstall({ confirmNvidiaDriverInstall: true });
+  } else {
+    appendLog('meta', 'Installation annulée : pilote Nvidia non installé.');
+    state.installDone = { success: false, message: 'Installation annulée : pilote Nvidia non installé.' };
+    renderProgress();
   }
 });
 

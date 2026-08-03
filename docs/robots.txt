@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://ollama-configuration.vercel.app/sitemap.xml
+Sitemap: https://selfllama.vercel.app/sitemap.xml

@@ -1,9 +1,13 @@
 [package]
-name = "ollama-stack-gui"
+name = "selfllama-gui"
 version = "0.1.0"
-description = "GUI orchestrator for the ollama-configuration install scripts"
+description = "GUI orchestrator for the SelfLlama install scripts"
 edition = "2021"
 rust-version = "1.77"
+
+[lib]
+name = "selfllama_gui"
+path = "src/lib.rs"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
@@ -13,10 +17,22 @@ tauri = { version = "2", features = [] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 url = "2"
+# Aliased to selfllama-core, not "core": the package is really named "core"
+# (see application/core/Cargo.toml) and that's fine for application/src-tauri,
+# which has no proc macros expecting a bare `core::` path to mean the
+# standard library - but gui/src-tauri uses #[tauri::command]/
+# tauri::generate_handler!/tauri::generate_context!, whose expansions do
+# reference ::core:: assuming the standard library. A dependency named
+# literally "core" here shadows that and breaks every one of those macros
+# (confirmed: cargo build failed with "cannot find `option` in `core`"
+# pointing at the macro expansions). The `package = "core"` key repoints
+# this alias at the real path dependency without renaming it anywhere else.
+selfllama-core = { package = "core", path = "../../application/core" }
+selfllama-installer = { path = "../../application/src-tauri" }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
 
 [[bin]]
-name = "ollama-stack-gui"
+name = "selfllama-gui"
 path = "src/main.rs"

@@ -1,3 +1,57 @@
+# [1.2.0](https://github.com/Mvth1s/ollama-configuration/compare/v1.1.4...v1.2.0) (2026-07-28)
+
+
+### Bug Fixes
+
+* **gui:** stream ollama pull's ANSI-redrawn progress instead of buffering it ([add58f4](https://github.com/Mvth1s/ollama-configuration/commit/add58f4fe028e72e17f3c442b23ad145edc97638))
+
+
+### Features
+
+* **packaging:** add Arch Linux PKGBUILDs for gui and launcher ([fd28179](https://github.com/Mvth1s/ollama-configuration/commit/fd28179de04bcd6df9f613f3509f48b96dd31a5b))
+
+## [1.1.4](https://github.com/Mvth1s/ollama-configuration/compare/v1.1.3...v1.1.4) (2026-07-28)
+
+
+### Bug Fixes
+
+* **gui:** stop the GUI's webui step from hanging on a hidden sudo call ([e6e9d0c](https://github.com/Mvth1s/ollama-configuration/commit/e6e9d0c4492ff6514c386aa391c98a0ea02faaea))
+
+## [1.1.3](https://github.com/Mvth1s/ollama-configuration/compare/v1.1.2...v1.1.3) (2026-07-27)
+
+
+### Bug Fixes
+
+* **gui:** bundle setup.sh itself, missing from the resource list ([e5cbb2c](https://github.com/Mvth1s/ollama-configuration/commit/e5cbb2cda2e253a31f925a2ae9287a478a3b8304)), closes [#49](https://github.com/Mvth1s/ollama-configuration/issues/49)
+
+## [1.1.2](https://github.com/Mvth1s/ollama-configuration/compare/v1.1.1...v1.1.2) (2026-07-27)
+
+
+### Bug Fixes
+
+* **release:** run the version-sync step under bash on windows-latest too ([a987b30](https://github.com/Mvth1s/ollama-configuration/commit/a987b30d06c22a9ca3b865a1eb73b4f13cf75856)), closes [#48](https://github.com/Mvth1s/ollama-configuration/issues/48)
+
+## [1.1.1](https://github.com/Mvth1s/ollama-configuration/compare/v1.1.0...v1.1.1) (2026-07-27)
+
+
+### Bug Fixes
+
+* **gui:** bundle the install scripts as Tauri resources ([f684143](https://github.com/Mvth1s/ollama-configuration/commit/f684143818de9384f3fd4edd37bd4e88285e46b3))
+* **release:** stop clobbering release notes, unify asset names, sync app version ([e6b63d0](https://github.com/Mvth1s/ollama-configuration/commit/e6b63d0b4a40fd896fef53b16c05639c6efe8187))
+
+# [1.1.0](https://github.com/Mvth1s/ollama-configuration/compare/v1.0.1...v1.1.0) (2026-07-27)
+
+
+### Bug Fixes
+
+* **gui,launcher:** re-encode icon PNGs as 8-bit to fix the Windows build ([4a20b8a](https://github.com/Mvth1s/ollama-configuration/commit/4a20b8aee9202bf0c368f2da63e3c4bc2524538e))
+* **release:** bump release.yml to Node 24, sync dev's package.json/lock ([f973fb9](https://github.com/Mvth1s/ollama-configuration/commit/f973fb90aaad4e7a4683904e75de5c3d7ff3e976)), closes [#45](https://github.com/Mvth1s/ollama-configuration/issues/45) [#39](https://github.com/Mvth1s/ollama-configuration/issues/39)
+
+
+### Features
+
+* **docs:** add a direct-download section to the showcase site ([b136b98](https://github.com/Mvth1s/ollama-configuration/commit/b136b9853732cfb791f66dc0151cb70bb16abfcd)), closes [#download](https://github.com/Mvth1s/ollama-configuration/issues/download)
+
 ## [1.0.1](https://github.com/Mvth1s/ollama-configuration/compare/v1.0.0...v1.0.1) (2026-07-24)
 
 

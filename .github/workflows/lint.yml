@@ -1,9 +1,17 @@
 name: Lint
 
-# Runs ShellCheck over every Bash script. Run the same command locally:
-# shellcheck -x *.sh lib/*.sh (see README.md). Also lints the Windows side
-# (setup.ps1 + lib/common.ps1 + toggle-webui-lan.ps1) with PSScriptAnalyzer,
-# since ShellCheck has no PowerShell equivalent.
+# Runs ShellCheck over every Bash script under scripts/linux/. Run the same
+# command locally: (cd scripts/linux && shellcheck -x *.sh lib/*.sh) (see
+# README.md) - invoked from within scripts/linux/, not the repo root, because
+# ShellCheck -x resolves each script's bare `source lib/common.sh` relative
+# to ShellCheck's own working directory, not the checked file's directory;
+# running it from the repo root against scripts/linux/*.sh (as this used to
+# be invoked pre-restructure, when the scripts lived at the repo root and the
+# two directories happened to coincide) produces spurious SC1091 "does not
+# exist" warnings for lib/common.sh now that the scripts have moved. Also
+# lints the Windows side (scripts/windows/setup.ps1 +
+# scripts/windows/lib/common.ps1 + scripts/windows/toggle-webui-lan.ps1) with
+# PSScriptAnalyzer, since ShellCheck has no PowerShell equivalent.
 #
 # Called from ci.yml (workflow_call) as one of the fast jobs that gate
 # rust-ci.yml/e2e.yml; workflow_dispatch kept for a standalone manual run.
@@ -27,11 +35,14 @@ jobs:
       # rather than buried in ShellCheck's own diagnostics.
       - name: bash -n syntax check
         run: |
-          for f in *.sh lib/*.sh; do
+          for f in scripts/linux/*.sh scripts/linux/lib/*.sh; do
             bash -n "$f"
           done
 
+      # Run from within scripts/linux/ itself, not the repo root - see the
+      # comment at the top of this file for why.
       - name: Run ShellCheck
+        working-directory: scripts/linux
         run: shellcheck -x *.sh lib/*.sh
 
   psscriptanalyzer:
@@ -68,7 +79,7 @@ jobs:
           #                            read-only (detects and logs, does not
           #                            mutate anything), despite the Set- verb.
           $excluded = 'PSAvoidGlobalVars', 'PSAvoidUsingWriteHost', 'PSUseApprovedVerbs', 'PSReviewUnusedParameter', 'PSUseShouldProcessForStateChangingFunctions'
-          $files = 'setup.ps1', 'lib/common.ps1', 'toggle-webui-lan.ps1'
+          $files = 'scripts/windows/setup.ps1', 'scripts/windows/lib/common.ps1', 'scripts/windows/toggle-webui-lan.ps1'
           $results = $files | ForEach-Object { Invoke-ScriptAnalyzer -Path $_ -Severity Warning, Error -ExcludeRule $excluded }
           $results | Format-Table -AutoSize
           if ($results) {

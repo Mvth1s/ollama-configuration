@@ -11,6 +11,22 @@ makedepends=('rust')
 source=("$pkgname-$pkgver.tar.gz::https://github.com/Mvth1s/ollama-configuration/archive/refs/tags/v$pkgver.tar.gz")
 sha256sums=('681730cc95b67d2ae1abfa133768bb448517be85495a85c262e1295ab8b4260a')
 
+# DEFERRED RENAME - do this together with the next version bump, not before:
+# launcher/src-tauri's crate/binary was renamed ollama-launcher ->
+# selfllama-launcher, and its tauri.conf.json productName "Ollama Launcher"
+# -> "SelfLlama Launcher" (see the repo-root CLAUDE.md's SelfLlama-rename
+# section and gui/PKGBUILD's identical note) - but pkgver here is still
+# pinned to v1.1.4, a release that predates that rename, so the real source
+# this PKGBUILD downloads and builds still produces a binary literally named
+# ollama-launcher. Renaming pkgname/Exec=/the install path below/.desktop
+# Name= now would break this PKGBUILD against the actual pinned source.
+# When bumping pkgver/sha256sums (see ../README.md's "Keeping this up to
+# date") to the first release that actually contains this rename, change all
+# of the following together:
+#   pkgname=selfllama-launcher
+#   the install -Dm755 source/dest paths below (ollama-launcher -> selfllama-launcher)
+#   the .desktop Name=/Exec= lines below
+
 # See gui/PKGBUILD for why a plain `cargo build --release` (no tauri-cli) is
 # enough: build.rs handles asset embedding either way, and this app's dist/
 # has no frontend build step. Unlike gui/, this app never touches

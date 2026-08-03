@@ -11,6 +11,29 @@ makedepends=('rust')
 source=("$pkgname-$pkgver.tar.gz::https://github.com/Mvth1s/ollama-configuration/archive/refs/tags/v$pkgver.tar.gz")
 sha256sums=('681730cc95b67d2ae1abfa133768bb448517be85495a85c262e1295ab8b4260a')
 
+# DEFERRED RENAME - do this together with the next version bump, not before:
+# gui/src-tauri's crate/binary was renamed ollama-stack-gui -> selfllama-gui,
+# and its tauri.conf.json productName "Ollama Stack GUI" -> "SelfLlama
+# Installer" (see the repo-root CLAUDE.md's SelfLlama-rename section), but
+# pkgver here is still pinned to v1.1.4, a release that predates that rename
+# - the real source this PKGBUILD downloads and builds still produces a
+# binary literally named ollama-stack-gui, under a productName that still
+# resolves to /usr/lib/Ollama Stack GUI/scripts. Renaming pkgname/Exec=/the
+# install path below/the resource-dir path/.desktop Name= now, while still
+# building v1.1.4's actual source, would break this PKGBUILD outright (the
+# install step would look for a file that doesn't exist in that build
+# output) - confirmed by dry-running the *planned* new names against a local
+# tarball of the rename's own source tree in an archlinux:base-devel
+# container (not against the real, still-pre-rename v1.1.4 tag), which
+# built and packaged correctly. When bumping pkgver/sha256sums (see
+# ../README.md's "Keeping this up to date") to the first release that
+# actually contains this rename, change all of the following together:
+#   pkgname=selfllama-gui
+#   pkgdesc="Installer GUI for the SelfLlama stack (Ollama + Open WebUI)"
+#   the install -Dm755 source/dest paths below (ollama-stack-gui -> selfllama-gui)
+#   the resdir line below (Ollama Stack GUI -> SelfLlama Installer)
+#   the .desktop Name=/Exec= lines below
+
 # No tauri-cli / `cargo tauri build` involved: asset embedding happens at
 # compile time via src-tauri/build.rs (tauri_build::build()) regardless of
 # how cargo is invoked, and both apps' dist/ is plain checked-in HTML/JS with
@@ -46,6 +69,19 @@ package() {
   # is built from config.product_name when set. This directory MUST keep
   # that exact name for find_scripts_dir() in gui/src-tauri/src/main.rs to
   # find it; if productName is ever renamed, update this path too.
+  # DEFERRED SCRIPTS/LINUX+WINDOWS PATH MOVE - see the DEFERRED RENAME note
+  # above, same root cause: pkgver is still pinned to v1.1.4, which predates
+  # the scripts/linux + scripts/windows reorg (see CLAUDE.md's Architecture
+  # section), so the real source this PKGBUILD downloads still has these
+  # files flat at the repo root, not under scripts/linux/scripts/windows.
+  # This was a real, confirmed regression (not caught by the SelfLlama-
+  # rename session's dry run, which only tested a *fabricated* tarball of
+  # the current working tree, not the real pinned v1.1.4 tag) - real CI
+  # (arch-package.yml on PR #65) failed with "install: cannot stat
+  # 'scripts/linux/setup.sh': No such file or directory" until this was
+  # reverted to the flat paths below. Update these back to scripts/linux/
+  # scripts/windows/ together with the next version bump, at the same time
+  # as the DEFERRED RENAME above.
   local resdir="$pkgdir/usr/lib/Ollama Stack GUI/scripts"
   install -Dm755 setup.sh "$resdir/setup.sh"
   install -Dm755 01-install-ollama.sh "$resdir/01-install-ollama.sh"

@@ -1,8 +1,8 @@
-# Ollama Configuration
+# SelfLlama
 
 > Bash and PowerShell scripts, plus two optional Tauri desktop apps, that install and configure a local Ollama + Open WebUI stack on Linux and Windows, with automatic GPU and RAM detection.
 
-Ollama Configuration is a 100% local, no-telemetry way to set up a personal LLM inference stack: it installs Ollama, configures GPU acceleration for the detected hardware, downloads a set of models sized to the machine, and deploys Open WebUI as a local web interface. Everything runs on the user's own machine; nothing is sent to a cloud service.
+SelfLlama is a 100% local, no-telemetry way to set up a personal LLM inference stack: it installs Ollama, configures GPU acceleration for the detected hardware, downloads a set of models sized to the machine, and deploys Open WebUI as a local web interface. Everything runs on the user's own machine; nothing is sent to a cloud service.
 
 ## Docs
 

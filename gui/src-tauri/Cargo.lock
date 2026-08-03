@@ -342,6 +342,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "core"
+version = "0.1.0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "core-foundation"
 version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2005,18 +2012,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ollama-stack-gui"
-version = "0.1.0"
-dependencies = [
- "libc",
- "serde",
- "serde_json",
- "tauri",
- "tauri-build",
- "url",
-]
-
-[[package]]
 name = "once_cell"
 version = "1.21.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2512,6 +2507,30 @@ dependencies = [
  "rustc-hash",
  "servo_arc",
  "smallvec",
+]
+
+[[package]]
+name = "selfllama-gui"
+version = "0.1.0"
+dependencies = [
+ "core",
+ "libc",
+ "selfllama-installer",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "url",
+]
+
+[[package]]
+name = "selfllama-installer"
+version = "0.1.0"
+dependencies = [
+ "core",
+ "libc",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
