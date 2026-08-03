@@ -3,20 +3,23 @@ name: E2E (WebDriver)
 # gui/dist and launcher/dist previously had no end-to-end coverage at all -
 # only pure Rust functions extracted out of their #[tauri::command]s were
 # unit-tested (see CLAUDE.md's Tests section). This drives the REAL built
-# app windows through tauri-driver via WebdriverIO, the same way Tauri's own
-# docs recommend:
+# app windows through tauri-driver/WebKitWebDriver via WebdriverIO, the same
+# way Tauri's own docs recommend:
 # https://v2.tauri.app/develop/tests/webdriver/example/webdriverio/
 #
-# e2e-linux drives WebKitWebDriver, e2e-windows drives msedgedriver - see
-# each job below. Called from ci.yml (workflow_call), gated on
-# lint.yml/test.yml succeeding first since this is the single most expensive
-# part of the pipeline; workflow_dispatch kept for a standalone manual run.
+# Linux only for now (WebKitWebDriver has no Windows equivalent - Tauri's
+# own CI example uses msedgedriver-tool for that, out of scope here since
+# scripts/windows/setup.ps1/the Windows side of gui/launcher aren't touched by these specs).
+#
+# Called from ci.yml (workflow_call), gated on lint.yml/test.yml succeeding
+# first since this is the single most expensive job in the pipeline;
+# workflow_dispatch kept for a standalone manual run.
 on:
   workflow_call:
   workflow_dispatch:
 
 jobs:
-  e2e-linux:
+  e2e:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -60,111 +63,3 @@ jobs:
       - name: Run WebDriver e2e tests
         working-directory: ${{ matrix.app }}/e2e-tests
         run: xvfb-run --auto-servernum npm test
-
-  # Two real CI runs against PR #65 so far, each surfacing a different real
-  # bug in the msedgedriver-matching step (confirming it as the actual weak
-  # point, as originally flagged - just not for either specific reason
-  # guessed each time):
-  #   1. msedgedriver.azureedge.net (the original download host) no longer
-  #      resolves at all ("No such host is known") - fixed by switching to
-  #      msedgedriver.microsoft.com.
-  #   2. That alone got further (msedgedriver downloaded, tauri-driver
-  #      started, the app itself launched) but then failed with
-  #      "session not created: DevToolsActivePort file doesn't exist" - a
-  #      well-documented symptom of the driver not matching the actual
-  #      WebView2 Runtime version (which can drift from the standalone Edge
-  #      browser's own version, even though both usually ship in lockstep).
-  #      Fixed by matching against the WebView2 Runtime's registry-reported
-  #      version instead of msedge.exe's. A newer, purpose-built
-  #      alternative (@wdio/tauri-service, which auto-manages this) was
-  #      evaluated and rejected: `npm install` succeeded, but the package
-  #      itself failed to import ("does not provide an export named
-  #      'installMockSyncOverride'") - a real bug in @wdio/tauri-service
-  #      1.2.0's own dependency on @wdio/native-utils@2.4.0, caught by
-  #      actually trying to import it locally before committing to it, not
-  #      assumed to work from its docs alone.
-  e2e-windows:
-    runs-on: windows-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        app: [gui, launcher]
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: dtolnay/rust-toolchain@stable
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: "${{ matrix.app }}/src-tauri -> target"
-
-      - name: Install tauri-driver
-        run: cargo install tauri-driver --locked
-
-      # windows-latest runners ship Microsoft Edge preinstalled, but
-      # tauri-driver needs a msedgedriver.exe matching the *WebView2
-      # Runtime* version passed via --native-driver (no WebKitWebDriver-
-      # style PATH auto-discovery on Windows). The Tauri app embeds
-      # WebView2, not the standalone Edge browser - the two ship on the
-      # same channel and are usually version-identical, but aren't
-      # guaranteed to be, and the first real run of this job (PR #65)
-      # failed with "session not created: DevToolsActivePort file doesn't
-      # exist" after matching against msedge.exe's own version instead -
-      # exactly the symptom of this kind of mismatch. Reads the WebView2
-      # Runtime's real installed version from the registry key Microsoft's
-      # own distribution docs document for this
-      # (HKLM\...\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5},
-      # the "pv" value - a different Client GUID from Edge the browser's
-      # own {56EB18F8-...}), falling back to msedge.exe's ProductVersion
-      # only if that key is somehow absent.
-      - name: Download the msedgedriver matching this runner's WebView2 Runtime
-        shell: pwsh
-        run: |
-          $webview2Guid = '{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}'
-          $regPaths = @(
-            "HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\$webview2Guid",
-            "HKLM:\SOFTWARE\Microsoft\EdgeUpdate\Clients\$webview2Guid",
-            "HKCU:\SOFTWARE\Microsoft\EdgeUpdate\Clients\$webview2Guid"
-          )
-          $edgeVersion = $null
-          foreach ($regPath in $regPaths) {
-            if (Test-Path $regPath) {
-              $pv = (Get-ItemProperty -Path $regPath -Name pv -ErrorAction SilentlyContinue).pv
-              if ($pv) { $edgeVersion = $pv; break }
-            }
-          }
-          if ($edgeVersion) {
-            Write-Host "Detected WebView2 Runtime version: $edgeVersion"
-          } else {
-            Write-Host "WebView2 Runtime version not found in the registry, falling back to the Edge browser's own version."
-            $edgePath = "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe"
-            if (-not (Test-Path $edgePath)) {
-              $edgePath = "$env:ProgramFiles\Microsoft\Edge\Application\msedge.exe"
-            }
-            $edgeVersion = (Get-Item $edgePath).VersionInfo.ProductVersion
-            Write-Host "Detected Microsoft Edge version: $edgeVersion"
-          }
-          $zipPath = Join-Path $env:RUNNER_TEMP 'edgedriver.zip'
-          $destDir = Join-Path $env:RUNNER_TEMP 'edgedriver'
-          Invoke-WebRequest -Uri "https://msedgedriver.microsoft.com/$edgeVersion/edgedriver_win64.zip" -OutFile $zipPath
-          Expand-Archive -Path $zipPath -DestinationPath $destDir
-          $driverPath = Join-Path $destDir 'msedgedriver.exe'
-          "TAURI_DRIVER_NATIVE_DRIVER=$driverPath" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: 'npm'
-          cache-dependency-path: ${{ matrix.app }}/e2e-tests/package-lock.json
-
-      - name: npm install
-        working-directory: ${{ matrix.app }}/e2e-tests
-        run: npm install
-
-      # onPrepare in wdio.conf.js builds the app itself, same as e2e-linux.
-      # No xvfb-run equivalent needed: unlike WebKitWebDriver, msedgedriver
-      # drives a real (non-headless) Edge-based webview window directly on
-      # the runner's desktop session.
-      - name: Run WebDriver e2e tests
-        working-directory: ${{ matrix.app }}/e2e-tests
-        run: npm test
