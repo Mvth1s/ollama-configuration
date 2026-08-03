@@ -22,10 +22,13 @@ struct InstallOptions {
     tier: Option<String>,
     skip_models: bool,
     skip_webui: bool,
-    // Per-usage model overrides from the wizard's "Modeles" step, applied as
-    // --model-<usage>=<name> flags to 03-pull-models.sh. Linux only: setup.ps1
-    // has no per-usage override mechanism (no interactive picker on Windows
-    // either, by existing design), so this is ignored in run_windows.
+    // Per-usage model overrides from the wizard's "Modeles" step: applied as
+    // --model-<usage>=<name> flags to 03-pull-models.sh on Linux (run_linux),
+    // and as -Model<Usage> parameters to setup.ps1 on Windows (run_windows) -
+    // both scripts expose the same override mechanism, and gui/dist's
+    // "Changer" dropdown is platform-agnostic (see CLAUDE.md's Detection-only
+    // mode section for how setup.ps1 -DetectOnly now reports real candidates
+    // too, not just tier_models).
     #[serde(default)]
     models: Option<HashMap<String, String>>,
     // Set by the frontend only on a deliberate re-run after the user has
@@ -761,6 +764,24 @@ fn run_windows(app: &AppHandle, repo_root: &Path, opts: &InstallOptions) -> Resu
     if let Some(tier) = &opts.tier {
         ps_args.push("-Tier".to_string());
         ps_args.push(tier.clone());
+    }
+    // Mirrors run_linux's --model-<usage>= handling just above, now that
+    // setup.ps1 -DetectOnly reports real candidates on Windows too (see
+    // CLAUDE.md's Detection-only mode section) and gui/dist's "Changer"
+    // dropdown - already platform-agnostic - can populate opts.models from
+    // a Windows detection result. Without this, a Windows user's picker
+    // choice would render correctly but silently have no effect on the
+    // real install, which would be worse than not offering the picker at
+    // all. -Model<Usage> params match setup.ps1's own parameter names.
+    if let Some(models) = &opts.models {
+        let usage_params =
+            [("texte", "-ModelTexte"), ("code", "-ModelCode"), ("reflexion", "-ModelReflexion"), ("embeddings", "-ModelEmbeddings")];
+        for (usage, param) in usage_params {
+            if let Some(model) = models.get(usage) {
+                ps_args.push(param.to_string());
+                ps_args.push(model.clone());
+            }
+        }
     }
 
     let arg_list = ps_args
