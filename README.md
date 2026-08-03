@@ -20,7 +20,7 @@ It works on both Linux and Windows, either through a graphical installer (no ter
 
 The simplest way to get started is the desktop app: download the installer for your platform, run it, and it walks you through detecting your hardware and picking models — no terminal required.
 
-- **[Download the installer](https://github.com/Mvth1s/ollama-configuration/releases)** for your platform and format (`.deb`/`.rpm`/`.AppImage` on Linux, `.msi`/`.exe` on Windows), or browse them visually on the **[showcase site](https://ollama-configuration.vercel.app/#download)**.
+- **[Download the installer](https://github.com/Mvth1s/ollama-configuration/releases)** for your platform and format (`.deb`/`.rpm`/`.AppImage` on Linux, `.msi`/`.exe` on Windows), or browse them visually on the **[showcase site](https://selfllama.vercel.app/#download)**.
 - **Arch Linux**: build a native package instead of using the `.AppImage` — see [`packaging/arch/README.md`](packaging/arch/README.md). This links against your system's own `webkit2gtk`/`gtk3` rather than the copies bundled in the AppImage, which have been reported to crash on launch on at least one Arch-based system with an AMD GPU.
 - Once installed, [`launcher/`](launcher/README.md) (SelfLlama Launcher) is the app you'll actually use day-to-day afterwards: open the chat interface, start/stop the service, manage models, and share access on your local network.
 
@@ -165,7 +165,7 @@ Turning LAN access **on** prints a warning every time, because `WEBUI_AUTH` stay
 
 Packaged installers (`.deb`/`.rpm`/`.AppImage`/`.msi`/`.exe`) for both `gui/` and `launcher/` are attached to [GitHub Releases](https://github.com/Mvth1s/ollama-configuration/releases) — built and published automatically by CI on every release.
 
-A showcase site for the project (`docs/index.html`) is live at **[ollama-configuration.vercel.app](https://ollama-configuration.vercel.app)**, with a `#download` section linking directly to the latest release's installer files per app/platform/format; `vercel.json` at the repo root points Vercel at the `docs/` folder. Deploys are automatic via Vercel's own Git integration (no GitHub Actions workflow involved): every push gets a preview deployment, and the production domain updates as soon as a change lands on `main`.
+A showcase site for the project (`docs/index.html`) is live at **[selfllama.vercel.app](https://selfllama.vercel.app)** (the Vercel project itself was renamed from `ollama-configuration` to `selfllama` at some point after the initial deploy; the old `ollama-configuration.vercel.app` now 307-redirects here), with a `#download` section linking directly to the latest release's installer files per app/platform/format; `vercel.json` at the repo root points Vercel at the `docs/` folder. Deploys are automatic via Vercel's own Git integration (no GitHub Actions workflow involved): every push gets a preview deployment, and the production domain updates as soon as a change lands on `main`.
 
 ## Contributing
 
