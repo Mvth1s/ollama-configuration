@@ -75,7 +75,9 @@ jobs:
       #
       # releaseAssetNamePattern gives every format (.deb/.rpm/.AppImage/
       # .msi/.exe) the same structure instead of each bundler's own default
-      # naming convention: ollama-<app>-<version>-<platform>-<arch>.<ext>.
+      # naming convention: selfllama-<app>-<version>-<platform>-<arch>.<ext>.
+      # Kept in lockstep with docs/index.html's download-section matching
+      # logic (`app.prefix`), which must use the identical prefix.
       - uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -83,8 +85,8 @@ jobs:
           projectPath: ${{ matrix.app }}
           tagName: ${{ github.ref_name }}
           releaseId: ${{ inputs.release_id }}
-          releaseName: "Ollama Configuration ${{ github.ref_name }}"
+          releaseName: "SelfLlama ${{ github.ref_name }}"
           releaseBody: "See the release notes above for what changed."
           releaseDraft: false
           prerelease: false
-          releaseAssetNamePattern: "ollama-${{ matrix.app }}-[version]-[platform]-[arch][ext]"
+          releaseAssetNamePattern: "selfllama-${{ matrix.app }}-[version]-[platform]-[arch][ext]"

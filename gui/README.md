@@ -1,4 +1,4 @@
-# Ollama Stack GUI
+# SelfLlama Installer
 
 A [Tauri](https://tauri.app) desktop GUI over `setup.sh` / `setup.ps1`, presented as a 4-step wizard (Detection → Models → Installation → Done). It does not duplicate any GPU/RAM/CPU detection or model-tier logic: the detection screen and per-usage model picker are backed by real `--detect-only`/`-DetectOnly` calls into the same scripts (see [the repo-root `CLAUDE.md`](../CLAUDE.md#detection-only-mode-and-non-interactive-model-overrides-for-the-gui-wizard) for the JSON protocol), the install screen spawns the appropriate script for the running OS as a child process and streams its stdout/stderr into a log pane in real time. An "Open Web UI" button on the final screen opens Open WebUI (`http://127.0.0.1:8080`) in a second borderless-chrome window, reusing the same Tauri app instead of a separate webview technology.
 

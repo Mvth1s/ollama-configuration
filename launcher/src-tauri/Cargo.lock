@@ -2136,20 +2136,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ollama-launcher"
-version = "0.1.0"
-dependencies = [
- "launcher-core",
- "local-ip-address",
- "reqwest",
- "serde",
- "serde_json",
- "tauri",
- "tauri-build",
- "url",
-]
-
-[[package]]
 name = "once_cell"
 version = "1.21.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2646,6 +2632,20 @@ dependencies = [
  "rustc-hash",
  "servo_arc",
  "smallvec",
+]
+
+[[package]]
+name = "selfllama-launcher"
+version = "0.1.0"
+dependencies = [
+ "launcher-core",
+ "local-ip-address",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "url",
 ]
 
 [[package]]

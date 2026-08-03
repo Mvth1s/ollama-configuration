@@ -23,28 +23,28 @@ stub_free_ram() {
 }
 
 seed_gpu_vendor() {
-  mkdir -p "$TEST_HOME/.config/ollama-stack"
-  printf 'GPU_VENDOR=%s\n' "\"$1\"" > "$TEST_HOME/.config/ollama-stack/state.env"
+  mkdir -p "$TEST_HOME/.config/selfllama"
+  printf 'GPU_VENDOR=%s\n' "\"$1\"" > "$TEST_HOME/.config/selfllama/state.env"
 }
 
 @test "--tier= forces the tier regardless of RAM" {
   stub_free_ram 64
-  run "$REPO_ROOT/03-pull-models.sh" --tier=M --no-tui
+  run "$REPO_ROOT/scripts/linux/03-pull-models.sh" --tier=M --no-tui
   [ "$status" -eq 0 ]
   [[ "$output" == *"Tier manually forced: M"* ]]
-  grep -q '^TIER=M$' "$TEST_HOME/.config/ollama-stack/state.env"
+  grep -q '^TIER=M$' "$TEST_HOME/.config/selfllama/state.env"
 }
 
 @test "auto-selects XS for <= 8GB RAM" {
   stub_free_ram 8
-  run "$REPO_ROOT/03-pull-models.sh" --no-tui
+  run "$REPO_ROOT/scripts/linux/03-pull-models.sh" --no-tui
   [ "$status" -eq 0 ]
   [[ "$output" == *"Selected model tier: XS"* ]]
 }
 
 @test "auto-selects S for <= 16GB RAM" {
   stub_free_ram 16
-  run "$REPO_ROOT/03-pull-models.sh" --no-tui
+  run "$REPO_ROOT/scripts/linux/03-pull-models.sh" --no-tui
   [ "$status" -eq 0 ]
   [[ "$output" == *"Selected model tier: S"* ]]
 }
@@ -52,7 +52,7 @@ seed_gpu_vendor() {
 @test "no dedicated GPU downgrades a would-be L tier to S" {
   stub_free_ram 64
   seed_gpu_vendor none
-  run "$REPO_ROOT/03-pull-models.sh" --no-tui
+  run "$REPO_ROOT/scripts/linux/03-pull-models.sh" --no-tui
   [ "$status" -eq 0 ]
   [[ "$output" == *"reduced to S"* ]]
   [[ "$output" == *"Selected model tier: S"* ]]
@@ -61,7 +61,7 @@ seed_gpu_vendor() {
 @test "no dedicated GPU downgrades a would-be M tier to S" {
   stub_free_ram 32
   seed_gpu_vendor none
-  run "$REPO_ROOT/03-pull-models.sh" --no-tui
+  run "$REPO_ROOT/scripts/linux/03-pull-models.sh" --no-tui
   [ "$status" -eq 0 ]
   [[ "$output" == *"reduced to S"* ]]
 }
@@ -69,7 +69,7 @@ seed_gpu_vendor() {
 @test "a dedicated GPU keeps the RAM-based L tier" {
   stub_free_ram 64
   seed_gpu_vendor nvidia
-  run "$REPO_ROOT/03-pull-models.sh" --no-tui
+  run "$REPO_ROOT/scripts/linux/03-pull-models.sh" --no-tui
   [ "$status" -eq 0 ]
   [[ "$output" != *"reduced to S"* ]]
   [[ "$output" == *"Selected model tier: L"* ]]
@@ -78,7 +78,7 @@ seed_gpu_vendor() {
 @test "a forced tier is not affected by the CPU-only downgrade rule" {
   stub_free_ram 64
   seed_gpu_vendor none
-  run "$REPO_ROOT/03-pull-models.sh" --tier=L --no-tui
+  run "$REPO_ROOT/scripts/linux/03-pull-models.sh" --tier=L --no-tui
   [ "$status" -eq 0 ]
   [[ "$output" != *"reduced to S"* ]]
   [[ "$output" == *"Tier manually forced: L"* ]]
@@ -87,7 +87,7 @@ seed_gpu_vendor() {
 @test "--detect-only prints tier/models/candidates as JSON and never pulls a model" {
   stub_free_ram 8
   stub_cmd ollama 'echo "OLLAMA $*" >> "$STUB_LOG"; exit 0'
-  run "$REPO_ROOT/03-pull-models.sh" --detect-only --tier=XS --no-tui
+  run "$REPO_ROOT/scripts/linux/03-pull-models.sh" --detect-only --tier=XS --no-tui
   [ "$status" -eq 0 ]
   [[ "$output" == *'__DETECT__{"ram_gb":8,"tier":"XS"'* ]]
   [[ "$output" == *'"tier_models":{"texte":"llama3.2:3b"'* ]]
@@ -97,7 +97,7 @@ seed_gpu_vendor() {
 
 @test "--model-<usage>= overrides the resolved model for that usage only" {
   stub_free_ram 8
-  run "$REPO_ROOT/03-pull-models.sh" --detect-only --tier=XS --no-tui --model-code=starcoder2:3b
+  run "$REPO_ROOT/scripts/linux/03-pull-models.sh" --detect-only --tier=XS --no-tui --model-code=starcoder2:3b
   [ "$status" -eq 0 ]
   [[ "$output" == *'"code":"starcoder2:3b"'* ]]
   [[ "$output" == *'"texte":"llama3.2:3b"'* ]]

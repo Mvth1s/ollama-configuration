@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Ollama Configuration</title>
+<title>SelfLlama Installer</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
@@ -11,7 +11,7 @@
 </head>
 <body>
 <main>
-  <nav id="stepper" class="stepper" aria-label="Etapes de l'installation"></nav>
+  <nav id="stepper" class="stepper" aria-label="Étapes de l'installation"></nav>
 
   <div class="content">
     <header class="step-header">
@@ -47,7 +47,8 @@
         <span id="install-label" class="install-label"></span>
         <span id="install-pct" class="install-pct"></span>
       </div>
-      <div class="progress-track"><div id="progress-fill" class="progress-fill"></div></div>
+      <div class="progress-track" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="Progression de l'installation"><div id="progress-fill" class="progress-fill"></div></div>
+      <p id="install-silent-status" class="install-silent-status hidden" aria-live="polite"></p>
       <pre id="install-log" class="install-log" aria-live="polite"></pre>
     </section>
 

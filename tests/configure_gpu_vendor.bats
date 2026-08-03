@@ -43,7 +43,7 @@ echo "01:00.0 3D controller [0302]: NVIDIA Corporation GA107M [GeForce RTX 3050 
 
 @test "no dedicated GPU: falls back to CPU, no driver install attempted" {
   stub_lspci none
-  run "$REPO_ROOT/02-configure-gpu.sh" --no-tui
+  run "$REPO_ROOT/scripts/linux/02-configure-gpu.sh" --no-tui
   [ "$status" -eq 0 ]
   [[ "$output" == *"No dedicated GPU, Ollama will run on CPU."* ]]
 }
@@ -53,7 +53,7 @@ echo "01:00.0 3D controller [0302]: NVIDIA Corporation GA107M [GeForce RTX 3050 
   stub_cmd nvidia-smi '
     if [ "$1" = "--query-gpu=name" ]; then echo "NVIDIA GeForce RTX 3070"; fi
   '
-  run "$REPO_ROOT/02-configure-gpu.sh" --no-tui
+  run "$REPO_ROOT/scripts/linux/02-configure-gpu.sh" --no-tui
   [ "$status" -eq 0 ]
   [[ "$output" == *"GPU selected for acceleration:"*"(nvidia)"* ]]
   [[ "$output" == *"Configuring Nvidia GPU (CUDA)"* ]]
@@ -62,7 +62,7 @@ echo "01:00.0 3D controller [0302]: NVIDIA Corporation GA107M [GeForce RTX 3050 
 
 @test "Nvidia GPU without a driver: declining the install prompt does not install anything" {
   stub_lspci nvidia
-  run bash -c "printf 'n\n' | '$REPO_ROOT/02-configure-gpu.sh' --no-tui"
+  run bash -c "printf 'n\n' | '$REPO_ROOT/scripts/linux/02-configure-gpu.sh' --no-tui"
   [ "$status" -eq 0 ]
   [[ "$output" == *"No Nvidia driver detected"* ]]
   [[ "$output" == *"GPU configuration complete."* ]]
@@ -73,7 +73,7 @@ echo "01:00.0 3D controller [0302]: NVIDIA Corporation GA107M [GeForce RTX 3050 
   stub_cmd nvidia-smi '
     if [ "$1" = "--query-gpu=name" ]; then echo "NVIDIA GeForce RTX 3050 Mobile"; fi
   '
-  run "$REPO_ROOT/02-configure-gpu.sh" --no-tui
+  run "$REPO_ROOT/scripts/linux/02-configure-gpu.sh" --no-tui
   [ "$status" -eq 0 ]
   [[ "$output" == *"GPU selected for acceleration:"*"(nvidia)"* ]]
 }
@@ -81,7 +81,7 @@ echo "01:00.0 3D controller [0302]: NVIDIA Corporation GA107M [GeForce RTX 3050 
 @test "AMD GPU with an unsupported gfx code: falls back to Vulkan + HSA override" {
   stub_lspci amd
   stub_cmd rocminfo 'echo "  Name: gfx1201"'
-  run "$REPO_ROOT/02-configure-gpu.sh" --no-tui
+  run "$REPO_ROOT/scripts/linux/02-configure-gpu.sh" --no-tui
   [ "$status" -eq 0 ]
   [[ "$output" == *"gfx1201 is not yet officially supported by ROCm."* ]]
   [[ "$output" == *"Applying workaround: OLLAMA_VULKAN=1 + HSA_OVERRIDE_GFX_VERSION=11.5.0"* ]]
@@ -90,14 +90,82 @@ echo "01:00.0 3D controller [0302]: NVIDIA Corporation GA107M [GeForce RTX 3050 
 @test "AMD GPU with an officially supported gfx code: uses default HIP config" {
   stub_lspci amd
   stub_cmd rocminfo 'echo "  Name: gfx1030"'
-  run "$REPO_ROOT/02-configure-gpu.sh" --no-tui
+  run "$REPO_ROOT/scripts/linux/02-configure-gpu.sh" --no-tui
   [ "$status" -eq 0 ]
   [[ "$output" == *"gfx1030 is officially supported by ROCm, using default config (HIP)."* ]]
 }
 
 @test "AMD GPU with rocminfo unavailable: enables Vulkan without a specific workaround" {
   stub_lspci amd
-  run "$REPO_ROOT/02-configure-gpu.sh" --no-tui
+  run "$REPO_ROOT/scripts/linux/02-configure-gpu.sh" --no-tui
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"GFX code not detected"* ]]
+  [[ "$output" == *"Enabling Vulkan backend by default, without a specific workaround."* ]]
+}
+
+# minimal_path_without_real_rocminfo DIR - builds a PATH (STUB_BIN plus DIR,
+# no more) containing symlinks to every external tool 02-configure-gpu.sh /
+# lib/common.sh actually shells out to, *except* rocminfo, resolved from
+# whatever the real ones are on the machine running the suite. Needed
+# because these find_rocminfo tests must prove the /opt/rocm fallback
+# triggers when rocminfo is genuinely absent from PATH - simply not calling
+# stub_cmd rocminfo (like the test above does) is not enough for that: on a
+# real ROCm dev machine (like the one that originally reported this bug),
+# rocminfo really is also installed somewhere on the ambient PATH this
+# sandbox inherits, which would make the test pass for the wrong reason
+# (PATH lookup succeeding) rather than the one being tested (the /opt
+# fallback).
+minimal_path_without_real_rocminfo() {
+  local dir="$1"
+  mkdir -p "$dir"
+  local tool
+  for tool in env bash awk grep sed cut head free nproc cat chmod dirname basename tr mkdir rm touch printf; do
+    local real
+    real="$(command -v "$tool" 2>/dev/null || true)"
+    [ -n "$real" ] && ln -sf "$real" "$dir/$tool"
+  done
+  echo "$STUB_BIN:$dir"
+}
+
+@test "AMD GPU with rocminfo missing from PATH but present at /opt/rocm/bin: uses the fallback" {
+  stub_lspci amd
+
+  mkdir -p "$TEST_HOME/opt/rocm/bin"
+  printf '#!/usr/bin/env bash\necho "  Name: gfx1201"\n' > "$TEST_HOME/opt/rocm/bin/rocminfo"
+  chmod +x "$TEST_HOME/opt/rocm/bin/rocminfo"
+  local minimal_path
+  minimal_path="$(minimal_path_without_real_rocminfo "$TEST_HOME/minimal-bin")"
+
+  ROCM_OPT_DIR="$TEST_HOME/opt" PATH="$minimal_path" \
+    run "$REPO_ROOT/scripts/linux/02-configure-gpu.sh" --no-tui
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"gfx1201 is not yet officially supported by ROCm."* ]]
+  [[ "$output" == *"Applying workaround: OLLAMA_VULKAN=1 + HSA_OVERRIDE_GFX_VERSION=11.5.0"* ]]
+}
+
+@test "AMD GPU with rocminfo missing from PATH but present at a versioned /opt/rocm-X.Y.Z/bin: uses the fallback" {
+  stub_lspci amd
+
+  mkdir -p "$TEST_HOME/opt/rocm-6.1.0/bin"
+  printf '#!/usr/bin/env bash\necho "  Name: gfx1030"\n' > "$TEST_HOME/opt/rocm-6.1.0/bin/rocminfo"
+  chmod +x "$TEST_HOME/opt/rocm-6.1.0/bin/rocminfo"
+  local minimal_path
+  minimal_path="$(minimal_path_without_real_rocminfo "$TEST_HOME/minimal-bin")"
+
+  ROCM_OPT_DIR="$TEST_HOME/opt" PATH="$minimal_path" \
+    run "$REPO_ROOT/scripts/linux/02-configure-gpu.sh" --no-tui
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"gfx1030 is officially supported by ROCm, using default config (HIP)."* ]]
+}
+
+@test "AMD GPU with rocminfo missing from PATH and from every /opt/rocm location: still falls back cleanly" {
+  stub_lspci amd
+  mkdir -p "$TEST_HOME/opt"
+  local minimal_path
+  minimal_path="$(minimal_path_without_real_rocminfo "$TEST_HOME/minimal-bin")"
+
+  ROCM_OPT_DIR="$TEST_HOME/opt" PATH="$minimal_path" \
+    run "$REPO_ROOT/scripts/linux/02-configure-gpu.sh" --no-tui
   [ "$status" -eq 0 ]
   [[ "$output" == *"GFX code not detected"* ]]
   [[ "$output" == *"Enabling Vulkan backend by default, without a specific workaround."* ]]
@@ -105,14 +173,14 @@ echo "01:00.0 3D controller [0302]: NVIDIA Corporation GA107M [GeForce RTX 3050 
 
 @test "Intel GPU: enables the best-effort Vulkan backend" {
   stub_lspci intel
-  run "$REPO_ROOT/02-configure-gpu.sh" --no-tui
+  run "$REPO_ROOT/scripts/linux/02-configure-gpu.sh" --no-tui
   [ "$status" -eq 0 ]
   [[ "$output" == *"Configuring Intel GPU (Vulkan, best effort)"* ]]
 }
 
 @test "--detect-only prints a __DETECT__ JSON line and never configures a driver" {
   stub_lspci nvidia
-  run "$REPO_ROOT/02-configure-gpu.sh" --detect-only --no-tui
+  run "$REPO_ROOT/scripts/linux/02-configure-gpu.sh" --detect-only --no-tui
   [ "$status" -eq 0 ]
   [[ "$output" == *'__DETECT__{"distro_pretty":'* ]]
   [[ "$output" == *'"gpu_vendor":"nvidia"'* ]]
@@ -122,7 +190,7 @@ echo "01:00.0 3D controller [0302]: NVIDIA Corporation GA107M [GeForce RTX 3050 
 
 @test "--detect-only reports the CPU model and thread count" {
   stub_lspci none
-  run "$REPO_ROOT/02-configure-gpu.sh" --detect-only --no-tui
+  run "$REPO_ROOT/scripts/linux/02-configure-gpu.sh" --detect-only --no-tui
   [ "$status" -eq 0 ]
   [[ "$output" == *'"cpu_model":'* ]]
   [[ "$output" == *'"cpu_threads":'* ]]

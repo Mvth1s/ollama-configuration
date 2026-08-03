@@ -4,11 +4,11 @@
 // heading, not the service-status/LAN-toggle state: those are populated by
 // async Tauri commands (webui_service_status, etc.) shortly after load, so
 // asserting on them here would be racy without an explicit wait.
-describe('Ollama Launcher window', () => {
+describe('SelfLlama Launcher window', () => {
   it('shows the app heading', async () => {
     const header = await $('main > h1');
     await header.waitForExist({ timeout: 10000 });
-    await expect(header).toHaveText('Ollama Launcher');
+    await expect(header).toHaveText('SelfLlama Launcher');
   });
 
   it('has the service and LAN cards present', async () => {

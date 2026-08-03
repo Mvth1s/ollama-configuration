@@ -14,12 +14,33 @@ updates:
     commit-message:
       prefix: "chore(launcher)"
 
+  - package-ecosystem: cargo
+    directory: /launcher/launcher-core
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "chore(launcher-core)"
+
   - package-ecosystem: npm
     directory: /
     schedule:
       interval: weekly
     commit-message:
       prefix: chore
+
+  - package-ecosystem: npm
+    directory: /gui/e2e-tests
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "chore(gui-e2e)"
+
+  - package-ecosystem: npm
+    directory: /launcher/e2e-tests
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "chore(launcher-e2e)"
 
   - package-ecosystem: github-actions
     directory: /

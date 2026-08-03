@@ -3,7 +3,7 @@
 // bats suite for the Bash scripts. Only checks what step 1 renders
 // synchronously at startup (see main.js's HEADERS/renderStepper), so this
 // doesn't depend on detect_system's async result and stays fast/stable.
-describe('Ollama Configuration installer wizard', () => {
+describe('SelfLlama installer wizard', () => {
   it('opens on step 1 with the detection title and subtitle', async () => {
     const title = await $('#step-title');
     await title.waitForExist({ timeout: 10000 });

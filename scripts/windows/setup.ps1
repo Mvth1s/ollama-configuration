@@ -9,8 +9,12 @@
     already detects CUDA and ROCm natively and needs no per-vendor drop-in, so
     this script only detects the GPU vendor to log it and warn about AMD chips
     that may fall outside ROCm's officially supported list on Windows. Model
-    tier selection and the model tables are identical to 03-pull-models.sh, by
-    hand-kept parity, so Linux and Windows never drift on model choice. Open
+    tier selection, the model tables, and the interactive-picker candidate
+    lists are identical to 03-pull-models.sh, by hand-kept parity, so Linux
+    and Windows never drift on model choice or on which alternatives a GUI
+    can offer. There is still no TUI here (Windows has none, by design) -
+    the candidate lists exist solely for -DetectOnly to report, so a caller
+    like the Tauri GUI's wizard can build its own picker. Open
     WebUI runs via a per-user scheduled task (AtLogOn) instead of a systemd
     user service, since systemd does not exist on Windows. It listens on
     127.0.0.1 only by default; run .\toggle-webui-lan.ps1 on|off|status at
@@ -41,11 +45,9 @@
 .PARAMETER ModelReflexion
 .PARAMETER ModelEmbeddings
     Override the resolved tier's default model for that usage, same
-    non-interactive mechanism as --model-<usage>= in 03-pull-models.sh. This
-    is CLI-only parity: unlike Linux, setup.ps1 has no CAND_<TIER>_<usage>
-    candidate lists or interactive picker, so there is nothing yet for a GUI
-    to offer as alternatives on Windows - these parameters exist for a
-    caller (script or human) that already knows which model tag it wants.
+    non-interactive mechanism as --model-<usage>= in 03-pull-models.sh. Kept
+    for a caller (script or human) that already knows which model tag it
+    wants without going through -DetectOnly's reported candidates first.
 
 .EXAMPLE
     .\setup.ps1
@@ -89,6 +91,97 @@ $ModelTiers = @{
     S  = @{ texte = 'llama3.1:8b';  code = 'qwen2.5-coder:7b';  reflexion = 'deepseek-r1:7b';   embeddings = 'nomic-embed-text' }
     M  = @{ texte = 'gemma3:12b';   code = 'devstral:24b';      reflexion = 'deepseek-r1:14b';  embeddings = 'nomic-embed-text' }
     L  = @{ texte = 'gemma3:27b';   code = 'qwen2.5-coder:32b'; reflexion = 'deepseek-r1:32b';  embeddings = 'nomic-embed-text' }
+}
+
+# ---------------------------------------------------------------------------
+# Interactive-picker candidates, one array per tier/usage, format
+# @{model=...; desc=...}. Windows counterpart to the CAND_<TIER>_<usage>
+# arrays in 03-pull-models.sh - kept in sync by hand with that file, same as
+# $ModelTiers above. The first entry for each usage always matches that
+# usage's $ModelTiers default, same invariant the Bash arrays keep. There is
+# still no TUI on Windows to render these directly (see Get-ModelTier) - they
+# exist purely for -DetectOnly to report as the "candidates" field, so the
+# Tauri GUI wizard's existing "Changer" dropdown (already generic over any
+# platform's reported candidates) can offer them the same way it already
+# does on Linux.
+# ---------------------------------------------------------------------------
+$ModelCandidates = @{
+    XS = @{
+        texte      = @(
+            @{ model = 'llama3.2:3b'; desc = 'Fast, solid generalist for low-end hardware' }
+            @{ model = 'qwen2.5:3b'; desc = 'Multilingual alternative' }
+            @{ model = 'phi3.5:3.8b'; desc = 'Compact, decent basic reasoning' }
+        )
+        code       = @(
+            @{ model = 'qwen2.5-coder:3b'; desc = 'Lightweight general-purpose coding model' }
+            @{ model = 'starcoder2:3b'; desc = 'Alternative geared toward completion' }
+        )
+        reflexion  = @(
+            @{ model = 'deepseek-r1:1.5b'; desc = 'Step-by-step reasoning, very lightweight' }
+            @{ model = 'qwen2.5:1.5b'; desc = 'Lightweight generalist alternative' }
+        )
+        embeddings = @(
+            @{ model = 'nomic-embed-text'; desc = 'Standard general-purpose embeddings' }
+            @{ model = 'all-minilm'; desc = 'Lighter, faster' }
+        )
+    }
+    S = @{
+        texte      = @(
+            @{ model = 'llama3.1:8b'; desc = 'Well-balanced generalist' }
+            @{ model = 'gemma2:9b'; desc = 'Google alternative, good instruction following' }
+            @{ model = 'mistral:7b'; desc = 'Fast, good tradeoff' }
+        )
+        code       = @(
+            @{ model = 'qwen2.5-coder:7b'; desc = 'General-purpose coding model' }
+            @{ model = 'codellama:7b'; desc = 'Meta alternative, geared toward completion' }
+        )
+        reflexion  = @(
+            @{ model = 'deepseek-r1:7b'; desc = 'Step-by-step reasoning' }
+            @{ model = 'qwen2.5:7b'; desc = 'Generalist alternative' }
+        )
+        embeddings = @(
+            @{ model = 'nomic-embed-text'; desc = 'Standard general-purpose embeddings' }
+            @{ model = 'all-minilm'; desc = 'Lighter, faster' }
+        )
+    }
+    M = @{
+        texte      = @(
+            @{ model = 'gemma3:12b'; desc = 'Recent Google generalist' }
+            @{ model = 'mistral-nemo:12b'; desc = 'Mistral/Nvidia alternative' }
+            @{ model = 'qwen2.5:14b'; desc = 'Bigger, better general reasoning' }
+        )
+        code       = @(
+            @{ model = 'devstral:24b'; desc = 'Geared toward coding agents' }
+            @{ model = 'qwen2.5-coder:14b'; desc = 'Lighter alternative' }
+        )
+        reflexion  = @(
+            @{ model = 'deepseek-r1:14b'; desc = 'Step-by-step reasoning' }
+            @{ model = 'qwen2.5:14b'; desc = 'Generalist alternative' }
+        )
+        embeddings = @(
+            @{ model = 'nomic-embed-text'; desc = 'Standard general-purpose embeddings' }
+            @{ model = 'mxbai-embed-large'; desc = 'More accurate, heavier' }
+        )
+    }
+    L = @{
+        texte      = @(
+            @{ model = 'gemma3:27b'; desc = 'Large Google generalist' }
+            @{ model = 'qwen2.5:32b'; desc = 'Alibaba alternative' }
+            @{ model = 'mixtral:8x7b'; desc = 'Mixture-of-experts, good speed/quality tradeoff' }
+        )
+        code       = @(
+            @{ model = 'qwen2.5-coder:32b'; desc = 'Large general-purpose coding model' }
+            @{ model = 'devstral:24b'; desc = 'Alternative geared toward coding agents' }
+        )
+        reflexion  = @(
+            @{ model = 'deepseek-r1:32b'; desc = 'Large step-by-step reasoning model' }
+            @{ model = 'qwq:32b'; desc = 'Alibaba alternative geared toward reasoning' }
+        )
+        embeddings = @(
+            @{ model = 'nomic-embed-text'; desc = 'Standard general-purpose embeddings' }
+            @{ model = 'mxbai-embed-large'; desc = 'More accurate, heavier' }
+        )
+    }
 }
 
 $AmdRocmHint = "Verify your AMD GPU is on ROCm's officially supported list for Windows (https://rocm.docs.amd.com/); the Ollama installer falls back on its own if it isn't."
@@ -206,7 +299,7 @@ function Install-OpenWebUI {
     $webuiBin = $null
     if (Get-Command pipx -ErrorAction SilentlyContinue) {
         pipx install open-webui 2>$null
-        pipx upgrade open-webui 2>$null
+        if ($LASTEXITCODE -ne 0) { pipx upgrade open-webui 2>$null }
         $pipxBinDir = (pipx environment --value PIPX_BIN_DIR).Trim()
         $candidate = Join-Path $pipxBinDir 'open-webui.exe'
         if (Test-Path $candidate) { $webuiBin = $candidate }
@@ -270,13 +363,14 @@ if ($DetectOnly) {
     Get-ModelTier
     Set-ModelOverride
 
-    # No CAND_<TIER>_<usage> equivalent exists on Windows (no interactive
-    # model picker here, by design - see Get-ModelTier/Install-Model above),
-    # so only the resolved per-usage defaults are reported, unlike the
-    # Linux --detect-only path which also reports alternative candidates.
     # snake_case keys, matching the JSON emitted by 02-configure-gpu.sh /
     # 03-pull-models.sh --detect-only, so the Rust side parses both
-    # platforms' output with the same field names.
+    # platforms' output with the same field names. "candidates" now mirrors
+    # 03-pull-models.sh's own --detect-only output (see $ModelCandidates
+    # above) rather than being omitted - the Rust DetectResultRaw type
+    # already defaults it to an empty map via #[serde(default)] when a
+    # platform's JSON has no such field, so this was always optional from
+    # the Rust side; it just had nothing to send before.
     $result = [ordered]@{
         distro_pretty = 'Windows'
         gpu_vendor    = $Global:GpuVendor
@@ -286,8 +380,15 @@ if ($DetectOnly) {
         ram_gb        = $Global:RamGb
         tier          = $Global:Tier
         tier_models   = $ModelTiers[$Global:Tier]
+        candidates    = $ModelCandidates[$Global:Tier]
     }
-    Write-Output ('__DETECT__' + ($result | ConvertTo-Json -Compress -Depth 4))
+    # -Depth 8: generous margin over the actual nesting
+    # (result -> candidates -> usage -> array -> {model,desc}, 4 real
+    # levels) since ConvertTo-Json silently truncates anything past -Depth
+    # rather than erroring, and there's no real cost to headroom here - this
+    # can't be tested locally in this session (no pwsh available), so
+    # erring toward "too deep" over "silently truncated JSON" is deliberate.
+    Write-Output ('__DETECT__' + ($result | ConvertTo-Json -Compress -Depth 8))
     exit 0
 }
 

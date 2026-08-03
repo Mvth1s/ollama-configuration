@@ -7,7 +7,7 @@
 # ~/.config, no distro/package-manager detection since there is only one
 # Windows). Provides:
 #   - logging helpers (Log-Info, Log-Ok, Log-Warn, Log-Err)
-#   - a small shared state system between scripts (%APPDATA%\ollama-stack),
+#   - a small shared state system between scripts (%APPDATA%\selfllama),
 #     using the same "VAR="value"" line format as state.env on Linux, so
 #     each script can run standalone or chained after another without
 #     re-detecting everything every time
@@ -17,13 +17,30 @@
 #     than commercial card names, for consistency with the Linux scripts
 # =============================================================================
 
-$StateDir = Join-Path $env:APPDATA 'ollama-stack'
+$StateDir = Join-Path $env:APPDATA 'selfllama'
 $StateFile = Join-Path $StateDir 'state.env'
+# Pre-rename (ollama-configuration) location of the same directory.
+$LegacyStateDir = Join-Path $env:APPDATA 'ollama-stack'
 
 function Log-Info([string]$Message) { Write-Host "[INFO] $Message" -ForegroundColor Cyan }
 function Log-Ok([string]$Message)   { Write-Host "[OK] $Message" -ForegroundColor Green }
 function Log-Warn([string]$Message) { Write-Host "[WARNING] $Message" -ForegroundColor Yellow }
 function Log-Err([string]$Message)  { Write-Host "[ERROR] $Message" -ForegroundColor Red }
+
+# One-time migration for installs that predate the SelfLlama rename - same
+# reasoning as lib/common.sh's migrate_legacy_state_dir: move the whole
+# directory (state.env, nothing else stored here on Windows) rather than
+# leave an existing user's saved Tier/GpuVendor/WebuiHost choices stranded
+# under the old path. A no-op on every run after the first, and on a fresh
+# install. If both happen to exist already, the old one is left alone.
+function Migrate-LegacyStateDir {
+    if (-not (Test-Path $StateDir) -and (Test-Path $LegacyStateDir)) {
+        New-Item -ItemType Directory -Path (Split-Path $StateDir -Parent) -Force | Out-Null
+        Move-Item -Path $LegacyStateDir -Destination $StateDir
+        Log-Info "Migrated existing configuration from $LegacyStateDir to $StateDir"
+    }
+}
+Migrate-LegacyStateDir
 
 # ---------------------------------------------------------------------------
 # Shared state between scripts (GpuVendor, GpuName, RamGb, Tier, ...).
@@ -36,8 +53,12 @@ function Load-State {
     if (-not (Test-Path $StateFile)) { return }
 
     Get-Content $StateFile | ForEach-Object {
-        if ($_ -match '^(\w+)="(.*)"$') {
-            Set-Variable -Scope Global -Name $Matches[1] -Value $Matches[2]
+        if ($_ -match "^(\w+)=(.*)$") {
+            $value = $Matches[2]
+            if ($value.StartsWith('"') -and $value.EndsWith('"')) {
+                $value = $value.Substring(1, $value.Length - 2)
+            }
+            Set-Variable -Scope Global -Name $Matches[1] -Value $value
         }
     }
 }
@@ -56,7 +77,8 @@ function Save-State {
     $updated = @()
     foreach ($name in $VarNames) {
         $value = Get-Variable -Scope Global -Name $name -ValueOnly -ErrorAction SilentlyContinue
-        $updated += '{0}="{1}"' -f $name, $value
+        $escaped = $value.Replace('"', '\"')
+        $updated += '{0}="{1}"' -f $name, $escaped
     }
 
     Set-Content -Path $StateFile -Value ($existing + $updated)

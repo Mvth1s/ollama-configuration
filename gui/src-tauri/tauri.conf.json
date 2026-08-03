@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Ollama Stack GUI",
+  "productName": "SelfLlama Installer",
   "version": "0.1.0",
-  "identifier": "com.ollamastack.gui",
+  "identifier": "com.selfllama.gui",
   "build": {
     "frontendDist": "../dist"
   },
@@ -10,7 +10,7 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "Ollama Stack",
+        "title": "SelfLlama Installer",
         "width": 760,
         "height": 640,
         "minWidth": 560,
@@ -26,7 +26,7 @@
     "active": true,
     "targets": "all",
     "category": "Utility",
-    "shortDescription": "Installer GUI for the ollama-configuration stack",
+    "shortDescription": "Installer GUI for the SelfLlama stack",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -35,14 +35,14 @@
       "icons/icon.png"
     ],
     "resources": {
-      "../../setup.sh": "scripts/setup.sh",
-      "../../01-install-ollama.sh": "scripts/01-install-ollama.sh",
-      "../../02-configure-gpu.sh": "scripts/02-configure-gpu.sh",
-      "../../03-pull-models.sh": "scripts/03-pull-models.sh",
-      "../../04-install-webui.sh": "scripts/04-install-webui.sh",
-      "../../lib/common.sh": "scripts/lib/common.sh",
-      "../../setup.ps1": "scripts/setup.ps1",
-      "../../lib/common.ps1": "scripts/lib/common.ps1"
+      "../../scripts/linux/setup.sh": "scripts/setup.sh",
+      "../../scripts/linux/01-install-ollama.sh": "scripts/01-install-ollama.sh",
+      "../../scripts/linux/02-configure-gpu.sh": "scripts/02-configure-gpu.sh",
+      "../../scripts/linux/03-pull-models.sh": "scripts/03-pull-models.sh",
+      "../../scripts/linux/04-install-webui.sh": "scripts/04-install-webui.sh",
+      "../../scripts/linux/lib/common.sh": "scripts/lib/common.sh",
+      "../../scripts/windows/setup.ps1": "scripts/setup.ps1",
+      "../../scripts/windows/lib/common.ps1": "scripts/lib/common.ps1"
     }
   }
 }

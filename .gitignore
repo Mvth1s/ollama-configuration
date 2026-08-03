@@ -1,4 +1,4 @@
-# Rust / Tauri build artifacts (gui/, launcher/)
+# Rust / Tauri build artifacts (gui/, launcher/, application/)
 /gui/src-tauri/target/
 /gui/src-tauri/gen/schemas/
 /gui/node_modules/
@@ -6,6 +6,8 @@
 /launcher/src-tauri/gen/schemas/
 /launcher/launcher-core/target/
 /launcher/node_modules/
+/application/core/target/
+/application/src-tauri/target/
 
 # WebDriver e2e test runners (gui/e2e-tests, launcher/e2e-tests) - devDeps
 # only, never shipped with either app
