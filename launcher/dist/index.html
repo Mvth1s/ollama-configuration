@@ -23,7 +23,7 @@
         <span id="service-status-text" class="service-status-text">Vérification...</span>
       </div>
     </div>
-    <button type="button" id="service-toggle-btn" class="service-toggle-btn" disabled>...</button>
+    <button type="button" id="service-toggle-btn" class="service-toggle-btn" disabled aria-label="Démarrer ou arrêter Open WebUI">...</button>
   </div>
 
   <!-- LAN access -->
@@ -48,7 +48,7 @@
       </div>
       <button type="button" id="qr-toggle-btn" class="qr-toggle-btn">Afficher le QR code</button>
       <div id="qr-wrap" class="qr-wrap hidden">
-        <div id="qr-canvas" class="qr-canvas"></div>
+        <div id="qr-canvas" class="qr-canvas" role="img" aria-label="QR code pour ouvrir Open WebUI sur mobile"></div>
         <div class="qr-hint">Scanne pour ouvrir sur ton téléphone</div>
       </div>
     </div>
@@ -62,13 +62,13 @@
   <button type="button" id="webui-btn" class="primary full">Ouvrir Open WebUI</button>
 
   <section>
-    <h2>Models</h2>
-    <div id="models-empty" class="empty">Loading...</div>
+    <h2>Modèles</h2>
+    <div id="models-empty" class="empty">Chargement...</div>
     <table id="models-table" class="models hidden">
       <thead>
         <tr>
-          <th>Name</th>
-          <th>Size</th>
+          <th>Nom</th>
+          <th>Taille</th>
           <th>Params</th>
           <th>Quant</th>
           <th></th>
@@ -79,10 +79,10 @@
   </section>
 
   <section>
-    <h2>Pull a model</h2>
+    <h2>Télécharger un modèle</h2>
     <div class="pull-row">
-      <input type="text" id="pull-input" placeholder="e.g. llama3.2:3b" />
-      <button type="button" id="pull-btn">Pull</button>
+      <input type="text" id="pull-input" placeholder="ex. llama3.2:3b" aria-label="Nom du modèle à télécharger" />
+      <button type="button" id="pull-btn">Télécharger</button>
     </div>
     <div id="pull-status" class="pull-status"></div>
   </section>

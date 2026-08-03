@@ -27,7 +27,7 @@ jobs:
   syntax-check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # docs/index.html has exactly one plain <script> (the JSON-LD block
       # right above it uses <script type="application/ld+json">, which this

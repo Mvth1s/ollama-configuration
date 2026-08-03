@@ -51,7 +51,10 @@ if command -v pipx >/dev/null 2>&1; then
   pipx install open-webui || pipx upgrade open-webui
   WEBUI_BIN="$(pipx environment --value PIPX_BIN_DIR 2>/dev/null)/open-webui"
 else
-  pip install --break-system-packages --upgrade open-webui
+  case "$DISTRO_FAMILY" in
+    debian) pip install --break-system-packages --upgrade open-webui ;;
+    *)      pip install --user --upgrade open-webui ;;
+  esac
   WEBUI_BIN="$(command -v open-webui)"
 fi
 

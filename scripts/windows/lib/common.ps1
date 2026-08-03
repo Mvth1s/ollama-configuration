@@ -53,8 +53,12 @@ function Load-State {
     if (-not (Test-Path $StateFile)) { return }
 
     Get-Content $StateFile | ForEach-Object {
-        if ($_ -match '^(\w+)="(.*)"$') {
-            Set-Variable -Scope Global -Name $Matches[1] -Value $Matches[2]
+        if ($_ -match "^(\w+)=(.*)$") {
+            $value = $Matches[2]
+            if ($value.StartsWith('"') -and $value.EndsWith('"')) {
+                $value = $value.Substring(1, $value.Length - 2)
+            }
+            Set-Variable -Scope Global -Name $Matches[1] -Value $value
         }
     }
 }
@@ -73,7 +77,8 @@ function Save-State {
     $updated = @()
     foreach ($name in $VarNames) {
         $value = Get-Variable -Scope Global -Name $name -ValueOnly -ErrorAction SilentlyContinue
-        $updated += '{0}="{1}"' -f $name, $value
+        $escaped = $value.Replace('"', '\"')
+        $updated += '{0}="{1}"' -f $name, $escaped
     }
 
     Set-Content -Path $StateFile -Value ($existing + $updated)

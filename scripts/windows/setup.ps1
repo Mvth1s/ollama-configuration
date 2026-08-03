@@ -299,7 +299,7 @@ function Install-OpenWebUI {
     $webuiBin = $null
     if (Get-Command pipx -ErrorAction SilentlyContinue) {
         pipx install open-webui 2>$null
-        pipx upgrade open-webui 2>$null
+        if ($LASTEXITCODE -ne 0) { pipx upgrade open-webui 2>$null }
         $pipxBinDir = (pipx environment --value PIPX_BIN_DIR).Trim()
         $candidate = Join-Path $pipxBinDir 'open-webui.exe'
         if (Test-Path $candidate) { $webuiBin = $candidate }

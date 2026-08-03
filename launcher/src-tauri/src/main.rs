@@ -172,7 +172,8 @@ fn delete_model(model: String) -> Result<(), String> {
 
 #[cfg(not(target_os = "windows"))]
 fn webui_unit_installed() -> bool {
-    PathBuf::from(std::env::var("HOME").unwrap_or_default())
+    let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".into());
+    PathBuf::from(home)
         .join(".config/systemd/user/open-webui.service")
         .exists()
 }
@@ -276,7 +277,7 @@ fn get_lan_url() -> Result<String, String> {
 // migrated it.
 #[cfg(not(target_os = "windows"))]
 fn state_dir() -> PathBuf {
-    let home = std::env::var("HOME").unwrap_or_default();
+    let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".into());
     let new_dir = PathBuf::from(&home).join(".config/selfllama");
     let legacy_dir = PathBuf::from(&home).join(".config/ollama-stack");
     if !new_dir.exists() && legacy_dir.is_dir() {

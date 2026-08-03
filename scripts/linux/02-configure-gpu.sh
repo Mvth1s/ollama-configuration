@@ -162,7 +162,6 @@ configure_amd() {
     clear_ollama_override
   fi
 
-  save_state
 }
 
 write_amd_override() {
