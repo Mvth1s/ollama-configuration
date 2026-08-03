@@ -172,7 +172,8 @@ fn delete_model(model: String) -> Result<(), String> {
 
 #[cfg(not(target_os = "windows"))]
 fn webui_unit_installed() -> bool {
-    PathBuf::from(std::env::var("HOME").unwrap_or_default())
+    let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".into());
+    PathBuf::from(home)
         .join(".config/systemd/user/open-webui.service")
         .exists()
 }
@@ -269,7 +270,8 @@ fn get_lan_url() -> Result<String, String> {
 
 #[cfg(not(target_os = "windows"))]
 fn webui_env_path() -> PathBuf {
-    PathBuf::from(std::env::var("HOME").unwrap_or_default()).join(".config/ollama-stack/webui.env")
+    let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".into());
+    PathBuf::from(home).join(".config/ollama-stack/webui.env")
 }
 
 #[cfg(not(target_os = "windows"))]

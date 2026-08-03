@@ -113,7 +113,8 @@ function renderPanels() {
 }
 
 function renderNav() {
-  backBtn.classList.toggle('hidden', !(state.step > 1 && state.step !== 3));
+  const installFailed = state.step === 3 && state.installDone && !state.installDone.success;
+  backBtn.classList.toggle('hidden', !(state.step > 1 && (state.step !== 3 || installFailed)));
 
   if (state.step === 3) {
     nextBtn.disabled = true;
@@ -195,6 +196,17 @@ async function runDetection() {
   } catch (err) {
     detectErrorEl.textContent = String(err);
     detectErrorEl.classList.remove('hidden');
+
+    const retryBtn = document.createElement('button');
+    retryBtn.type = 'button';
+    retryBtn.className = 'btn-retry';
+    retryBtn.textContent = 'Réessayer';
+    retryBtn.addEventListener('click', () => {
+      retryBtn.remove();
+      runDetection();
+    });
+    detectErrorEl.appendChild(document.createTextNode(' '));
+    detectErrorEl.appendChild(retryBtn);
     return;
   }
 
@@ -308,6 +320,7 @@ function computeProgress() {
 function renderProgress() {
   const pct = computeProgress();
   progressFillEl.style.width = `${pct}%`;
+  progressFillEl.parentElement.setAttribute('aria-valuenow', String(pct));
   installPctEl.textContent = `${pct}%`;
   installLabelEl.textContent = state.installDone ? (state.installDone.success ? 'Terminé' : "Échec de l'installation") : 'Installation en cours…';
 }
@@ -360,6 +373,9 @@ listen('install-done', (event) => {
     state.maxStep = Math.max(state.maxStep, 4);
     render();
     renderDone();
+  } else {
+    renderProgress();
+    backBtn.classList.remove('hidden');
   }
 });
 
@@ -406,7 +422,11 @@ skipWebuiInput.addEventListener('change', () => {
 });
 
 backBtn.addEventListener('click', () => {
-  if (state.step > 1 && state.step !== 3) goStep(state.step - 1);
+  if (state.step === 3 && state.installDone && !state.installDone.success) {
+    goStep(2);
+  } else if (state.step > 1 && state.step !== 3) {
+    goStep(state.step - 1);
+  }
 });
 
 nextBtn.addEventListener('click', () => {

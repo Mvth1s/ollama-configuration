@@ -506,10 +506,14 @@ fn stream_child(app: &AppHandle, mut child: std::process::Child) -> Result<bool,
 
     let status = child.wait().map_err(|e| format!("failed to wait for child process: {e}"))?;
     if let Some(h) = out_handle {
-        let _ = h.join();
+        if let Err(e) = h.join() {
+            eprintln!("stdout reader thread panicked: {e:?}");
+        }
     }
     if let Some(h) = err_handle {
-        let _ = h.join();
+        if let Err(e) = h.join() {
+            eprintln!("stderr reader thread panicked: {e:?}");
+        }
     }
 
     Ok(status.success())

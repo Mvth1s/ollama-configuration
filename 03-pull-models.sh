@@ -81,9 +81,16 @@ MODEL_TEXTE_OVERRIDE=""
 MODEL_CODE_OVERRIDE=""
 MODEL_REFLEXION_OVERRIDE=""
 MODEL_EMBEDDINGS_OVERRIDE=""
+VALID_TIERS="XS S M L"
 for arg in "$@"; do
   case "$arg" in
-    --tier=*) FORCE_TIER="${arg#*=}" ;;
+    --tier=*)
+      FORCE_TIER="${arg#*=}"
+      if ! echo "$VALID_TIERS" | grep -qw "$FORCE_TIER"; then
+        log_err "Invalid tier '$FORCE_TIER'. Valid tiers: XS, S, M, L"
+        exit 1
+      fi
+      ;;
     --no-tui) NO_TUI=1 ;;
     --detect-only) DETECT_ONLY=1 ;;
     --model-texte=*) MODEL_TEXTE_OVERRIDE="${arg#*=}" ;;

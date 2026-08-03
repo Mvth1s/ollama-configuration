@@ -20,7 +20,8 @@
   --border-3: #f0f1f6;
 
   --ok: #10b981;
-  --ok-bg: #e8faf1;
+  --ok-bg: #f4fbf7;
+  --ok-border: #d6f1e4;
   --warn-ink: #b45309;
   --warn-bg: #fef6e7;
   --err: #e05a5a;
@@ -36,8 +37,7 @@
 body {
   margin: 0;
   background:
-    radial-gradient(1000px 560px at 0% -10%, #e7e9ff 0%, rgba(231, 233, 255, 0) 55%),
-    radial-gradient(900px 560px at 110% 115%, #f3e7ff 0%, rgba(243, 231, 255, 0) 55%),
+    radial-gradient(900px 500px at 0% -10%, #e7e9ff 0%, rgba(231, 233, 255, 0) 55%),
     linear-gradient(178deg, #f7f8fd 0%, #f0f1f8 100%);
   color: var(--ink);
 }
@@ -78,6 +78,16 @@ main {
 .step:disabled {
   cursor: default;
   opacity: 0.5;
+}
+
+.step:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 2px;
+  border-radius: 11px;
+}
+
+.step:hover:not(:disabled) {
+  background: var(--acc-bg);
 }
 
 .step-badge {
@@ -315,6 +325,32 @@ main {
   font-size: 13px;
 }
 
+.btn-retry {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--err);
+  background: transparent;
+  color: var(--err);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: inherit;
+  margin-left: 6px;
+}
+
+.btn-retry:focus-visible {
+  outline: 2px solid var(--err);
+  outline-offset: 2px;
+}
+
+.btn-retry:hover {
+  background: var(--err);
+  color: #fff;
+}
+
 /* Step 2: model cards */
 .model-cards {
   display: grid;
@@ -420,6 +456,16 @@ main {
   color: var(--acc-ink);
 }
 
+.model-change-btn:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 2px;
+}
+
+.model-change-btn:hover:not(.is-open) {
+  border-color: var(--acc);
+  color: var(--acc-ink);
+}
+
 .model-menu {
   position: absolute;
   top: calc(100% - 4px);
@@ -454,6 +500,15 @@ main {
 }
 
 .model-option.is-current {
+  background: var(--acc-bg);
+}
+
+.model-option:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: -2px;
+}
+
+.model-option:hover {
   background: var(--acc-bg);
 }
 
@@ -779,7 +834,6 @@ main {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-top: 4px;
   border-top: 1px solid var(--border-3);
   padding-top: 16px;
 }
@@ -804,10 +858,29 @@ main {
   color: var(--ink-3);
 }
 
+.btn-back:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 2px;
+}
+
+.btn-back:hover {
+  border-color: var(--acc);
+  color: var(--acc-ink);
+}
+
 .btn-primary {
   background: var(--acc);
   color: #fff;
   box-shadow: 0 12px 24px -10px var(--acc);
+}
+
+.btn-primary:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 2px;
+}
+
+.btn-primary:hover:not(:disabled) {
+  filter: brightness(1.08);
 }
 
 .btn-primary:disabled {
