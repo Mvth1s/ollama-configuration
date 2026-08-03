@@ -1,3 +1,33 @@
+# [1.3.0](https://github.com/Mvth1s/ollama-configuration/compare/v1.2.0...v1.3.0) (2026-08-03)
+
+
+### Bug Fixes
+
+* **ci:** switch msedgedriver download host, azureedge.net is dead ([3ed702e](https://github.com/Mvth1s/ollama-configuration/commit/3ed702eee3e679f7f8bb66943aba082981c39c84))
+* **e2e:** add webviewOptions to tauri:options for msedgedriver ([a988956](https://github.com/Mvth1s/ollama-configuration/commit/a988956138096fac5dc6c4488ebc226a0d45677e)), closes [tauri-apps/tauri#12381](https://github.com/tauri-apps/tauri/issues/12381)
+* **gpu:** find rocminfo outside PATH; document untested iGPU/Arc split ([d787417](https://github.com/Mvth1s/ollama-configuration/commit/d787417f8eacb4f6680ffc42bb71b3b0d97b7f6d))
+* resolve bugs, accessibility gaps, and consistency issues across the project ([05bb630](https://github.com/Mvth1s/ollama-configuration/commit/05bb63083e105c8232b99428def5b55f4d796384))
+* windows compile break in application/src-tauri, PKGBUILD paths, msedgedriver version match ([b358ee8](https://github.com/Mvth1s/ollama-configuration/commit/b358ee8b9b0f69f273ac44d14ffcc8fcee2ee908))
+
+
+### Features
+
+* **application:** add application/core, a tauri-free detection crate ([d39cf05](https://github.com/Mvth1s/ollama-configuration/commit/d39cf0541c622737d068cd39ebe9a272665478c9))
+* **application:** add application/src-tauri and application::privileged ([124617b](https://github.com/Mvth1s/ollama-configuration/commit/124617bf001579cca505216784dd1f4587d2bcee))
+* **application:** add core::install, pure install plans for ollama/gpu/webui ([0cf8511](https://github.com/Mvth1s/ollama-configuration/commit/0cf8511d1d8bc079bf1259b2374e03eb6108c37e))
+* **application:** wire application::privileged to core::install's real plans ([10667b8](https://github.com/Mvth1s/ollama-configuration/commit/10667b872f79bb06e794497c7cd77651cf1cc2f8))
+* apply the SelfLlama rebrand across product-facing identifiers ([53f7e52](https://github.com/Mvth1s/ollama-configuration/commit/53f7e52952c684fd2e6dd858c2716182040b7190))
+* **ci:** add an e2e-windows WebDriver job alongside e2e-linux ([72f2831](https://github.com/Mvth1s/ollama-configuration/commit/72f2831a3d766edc2115e98d66693a3a0b008616))
+* **gui:** wire detect_system to selfllama_core directly on Linux ([9e0bbe3](https://github.com/Mvth1s/ollama-configuration/commit/9e0bbe3eab69bc78936f19ec174f6ddffb1b8148))
+* **gui:** wire gui/src-tauri to application::privileged, one pkexec call ([c314041](https://github.com/Mvth1s/ollama-configuration/commit/c314041ec8ce93bedc44bf0be37c5ea21f8bf54b))
+* **privileged:** add a silent-phase indicator for pacman/dnf/zypper ([d105b51](https://github.com/Mvth1s/ollama-configuration/commit/d105b515556ce82ae79d95a8b225daa6cca9ff29))
+* **windows:** add model-picker candidates parity with Linux ([2b95c64](https://github.com/Mvth1s/ollama-configuration/commit/2b95c6434f6daa6a71588eb925818bdfaca43a15))
+
+
+### Reverts
+
+* **e2e:** drop e2e-windows, three targeted fixes did not resolve it ([c886075](https://github.com/Mvth1s/ollama-configuration/commit/c8860759173bcb706514a72708fa34929ac57548))
+
 # [1.2.0](https://github.com/Mvth1s/ollama-configuration/compare/v1.1.4...v1.2.0) (2026-07-28)
 
 
