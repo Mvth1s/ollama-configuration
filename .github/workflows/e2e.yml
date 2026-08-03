@@ -61,16 +61,28 @@ jobs:
         working-directory: ${{ matrix.app }}/e2e-tests
         run: xvfb-run --auto-servernum npm test
 
-  # First real run (PR #65) confirmed the prediction below: it failed in
-  # exactly the predicted step, msedgedriver-matching, but not for the
-  # reason guessed (Program Files path / Edge channel were both fine -
-  # windows-latest's Edge version was read correctly). Real cause:
-  # msedgedriver.azureedge.net no longer resolves at all ("No such host is
-  # known") - Microsoft has since moved Edge WebDriver downloads to
-  # msedgedriver.microsoft.com, confirmed with a real HTTP 200 + matching
-  # edgedriver_win64.zip for the exact Edge version (150.0.4078.65) the
-  # failed run detected. Fixed below. The app/wdio.conf.js side was not the
-  # problem, as predicted - this only needed the download host corrected.
+  # Two real CI runs against PR #65 so far, each surfacing a different real
+  # bug in the msedgedriver-matching step (confirming it as the actual weak
+  # point, as originally flagged - just not for either specific reason
+  # guessed each time):
+  #   1. msedgedriver.azureedge.net (the original download host) no longer
+  #      resolves at all ("No such host is known") - fixed by switching to
+  #      msedgedriver.microsoft.com.
+  #   2. That alone got further (msedgedriver downloaded, tauri-driver
+  #      started, the app itself launched) but then failed with
+  #      "session not created: DevToolsActivePort file doesn't exist" - a
+  #      well-documented symptom of the driver not matching the actual
+  #      WebView2 Runtime version (which can drift from the standalone Edge
+  #      browser's own version, even though both usually ship in lockstep).
+  #      Fixed by matching against the WebView2 Runtime's registry-reported
+  #      version instead of msedge.exe's. A newer, purpose-built
+  #      alternative (@wdio/tauri-service, which auto-manages this) was
+  #      evaluated and rejected: `npm install` succeeded, but the package
+  #      itself failed to import ("does not provide an export named
+  #      'installMockSyncOverride'") - a real bug in @wdio/tauri-service
+  #      1.2.0's own dependency on @wdio/native-utils@2.4.0, caught by
+  #      actually trying to import it locally before committing to it, not
+  #      assumed to work from its docs alone.
   e2e-windows:
     runs-on: windows-latest
     strategy:
@@ -90,19 +102,48 @@ jobs:
         run: cargo install tauri-driver --locked
 
       # windows-latest runners ship Microsoft Edge preinstalled, but
-      # tauri-driver needs a msedgedriver.exe matching that exact Edge
-      # version passed via --native-driver (no WebKitWebDriver-style
-      # PATH auto-discovery on Windows). Reads the installed Edge's own
-      # ProductVersion and downloads the matching driver build.
-      - name: Download the msedgedriver matching this runner's Edge version
+      # tauri-driver needs a msedgedriver.exe matching the *WebView2
+      # Runtime* version passed via --native-driver (no WebKitWebDriver-
+      # style PATH auto-discovery on Windows). The Tauri app embeds
+      # WebView2, not the standalone Edge browser - the two ship on the
+      # same channel and are usually version-identical, but aren't
+      # guaranteed to be, and the first real run of this job (PR #65)
+      # failed with "session not created: DevToolsActivePort file doesn't
+      # exist" after matching against msedge.exe's own version instead -
+      # exactly the symptom of this kind of mismatch. Reads the WebView2
+      # Runtime's real installed version from the registry key Microsoft's
+      # own distribution docs document for this
+      # (HKLM\...\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5},
+      # the "pv" value - a different Client GUID from Edge the browser's
+      # own {56EB18F8-...}), falling back to msedge.exe's ProductVersion
+      # only if that key is somehow absent.
+      - name: Download the msedgedriver matching this runner's WebView2 Runtime
         shell: pwsh
         run: |
-          $edgePath = "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe"
-          if (-not (Test-Path $edgePath)) {
-            $edgePath = "$env:ProgramFiles\Microsoft\Edge\Application\msedge.exe"
+          $webview2Guid = '{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}'
+          $regPaths = @(
+            "HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\$webview2Guid",
+            "HKLM:\SOFTWARE\Microsoft\EdgeUpdate\Clients\$webview2Guid",
+            "HKCU:\SOFTWARE\Microsoft\EdgeUpdate\Clients\$webview2Guid"
+          )
+          $edgeVersion = $null
+          foreach ($regPath in $regPaths) {
+            if (Test-Path $regPath) {
+              $pv = (Get-ItemProperty -Path $regPath -Name pv -ErrorAction SilentlyContinue).pv
+              if ($pv) { $edgeVersion = $pv; break }
+            }
           }
-          $edgeVersion = (Get-Item $edgePath).VersionInfo.ProductVersion
-          Write-Host "Detected Microsoft Edge version: $edgeVersion"
+          if ($edgeVersion) {
+            Write-Host "Detected WebView2 Runtime version: $edgeVersion"
+          } else {
+            Write-Host "WebView2 Runtime version not found in the registry, falling back to the Edge browser's own version."
+            $edgePath = "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe"
+            if (-not (Test-Path $edgePath)) {
+              $edgePath = "$env:ProgramFiles\Microsoft\Edge\Application\msedge.exe"
+            }
+            $edgeVersion = (Get-Item $edgePath).VersionInfo.ProductVersion
+            Write-Host "Detected Microsoft Edge version: $edgeVersion"
+          }
           $zipPath = Join-Path $env:RUNNER_TEMP 'edgedriver.zip'
           $destDir = Join-Path $env:RUNNER_TEMP 'edgedriver'
           Invoke-WebRequest -Uri "https://msedgedriver.microsoft.com/$edgeVersion/edgedriver_win64.zip" -OutFile $zipPath

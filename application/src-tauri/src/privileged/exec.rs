@@ -46,6 +46,32 @@ fn is_executable(path: &std::path::Path) -> bool {
     std::fs::metadata(path).map(|m| m.permissions().mode() & 0o111 != 0).unwrap_or(false)
 }
 
+// application::privileged has no Windows code path at all (pkexec/systemd/
+// pacman-dnf-zypper-apt are Linux-only concepts - see this crate's own
+// top-level doc comment and CLAUDE.md's "Windows is out of scope for this
+// module" note): resolve_on_path/command_exists are only ever called from
+// steps/{ollama,gpu,webui}.rs building Linux-only Commands, which
+// run_privileged_worker is never invoked to run on Windows (gui/src-tauri's
+// run_windows uses Start-Process -Verb RunAs over setup.ps1 instead, a
+// wholly separate path). This exists purely so the crate compiles at all on
+// Windows, since gui/src-tauri depends on it unconditionally regardless of
+// target OS - found the hard way when a real Windows CI job
+// (e2e-windows, added in a session with no Windows machine available)
+// failed to build with "cannot find function `is_executable`" because this
+// function had no non-Unix branch. PATHEXT-style extension check, same
+// idea as `where`/PowerShell's own executable-resolution rules - doesn't
+// need to be exact since it is, in practice, dead code on this platform.
+#[cfg(windows)]
+fn is_executable(path: &std::path::Path) -> bool {
+    let Some(ext) = path.extension().and_then(|e| e.to_str()) else {
+        return false;
+    };
+    std::env::var("PATHEXT")
+        .unwrap_or_else(|_| ".COM;.EXE;.BAT;.CMD".to_string())
+        .split(';')
+        .any(|candidate| candidate.trim_start_matches('.').eq_ignore_ascii_case(ext))
+}
+
 /// Port of `pkg_install()` (`scripts/linux/lib/common.sh`), minus the
 /// `sudo` prefix every call there needs: this process already runs as root
 /// (inside the single `pkexec`'d worker), so there is nothing to elevate

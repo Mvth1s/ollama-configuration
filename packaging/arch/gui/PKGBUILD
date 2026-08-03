@@ -69,15 +69,28 @@ package() {
   # is built from config.product_name when set. This directory MUST keep
   # that exact name for find_scripts_dir() in gui/src-tauri/src/main.rs to
   # find it; if productName is ever renamed, update this path too.
+  # DEFERRED SCRIPTS/LINUX+WINDOWS PATH MOVE - see the DEFERRED RENAME note
+  # above, same root cause: pkgver is still pinned to v1.1.4, which predates
+  # the scripts/linux + scripts/windows reorg (see CLAUDE.md's Architecture
+  # section), so the real source this PKGBUILD downloads still has these
+  # files flat at the repo root, not under scripts/linux/scripts/windows.
+  # This was a real, confirmed regression (not caught by the SelfLlama-
+  # rename session's dry run, which only tested a *fabricated* tarball of
+  # the current working tree, not the real pinned v1.1.4 tag) - real CI
+  # (arch-package.yml on PR #65) failed with "install: cannot stat
+  # 'scripts/linux/setup.sh': No such file or directory" until this was
+  # reverted to the flat paths below. Update these back to scripts/linux/
+  # scripts/windows/ together with the next version bump, at the same time
+  # as the DEFERRED RENAME above.
   local resdir="$pkgdir/usr/lib/Ollama Stack GUI/scripts"
-  install -Dm755 scripts/linux/setup.sh "$resdir/setup.sh"
-  install -Dm755 scripts/linux/01-install-ollama.sh "$resdir/01-install-ollama.sh"
-  install -Dm755 scripts/linux/02-configure-gpu.sh "$resdir/02-configure-gpu.sh"
-  install -Dm755 scripts/linux/03-pull-models.sh "$resdir/03-pull-models.sh"
-  install -Dm755 scripts/linux/04-install-webui.sh "$resdir/04-install-webui.sh"
-  install -Dm644 scripts/linux/lib/common.sh "$resdir/lib/common.sh"
-  install -Dm644 scripts/windows/setup.ps1 "$resdir/setup.ps1"
-  install -Dm644 scripts/windows/lib/common.ps1 "$resdir/lib/common.ps1"
+  install -Dm755 setup.sh "$resdir/setup.sh"
+  install -Dm755 01-install-ollama.sh "$resdir/01-install-ollama.sh"
+  install -Dm755 02-configure-gpu.sh "$resdir/02-configure-gpu.sh"
+  install -Dm755 03-pull-models.sh "$resdir/03-pull-models.sh"
+  install -Dm755 04-install-webui.sh "$resdir/04-install-webui.sh"
+  install -Dm644 lib/common.sh "$resdir/lib/common.sh"
+  install -Dm644 setup.ps1 "$resdir/setup.ps1"
+  install -Dm644 lib/common.ps1 "$resdir/lib/common.ps1"
 
   # 128x128@2x.png is a real 256x256 PNG (macOS/Tauri @2x naming, not a
   # literal hicolor size), so it belongs under hicolor's 256x256 tier.
