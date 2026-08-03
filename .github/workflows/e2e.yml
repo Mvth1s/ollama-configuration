@@ -61,16 +61,16 @@ jobs:
         working-directory: ${{ matrix.app }}/e2e-tests
         run: xvfb-run --auto-servernum npm test
 
-  # UNVERIFIED as of the change that added this job - no Windows machine/VM
-  # was available to run it before merging, only Tauri's own documented
-  # Windows WebDriver setup to go on (see the URL in this file's own header
-  # comment, and https://github.com/tauri-apps/tauri/tree/dev/examples/api,
-  # whose CI downloads a matching msedgedriver the same way). If this job
-  # fails on its first real run, the msedgedriver-matching step below is the
-  # most likely culprit (Program Files path, or the exact Edge channel
-  # windows-latest ships) - not the app/wdio.conf.js side, which mirrors the
-  # already-proven Linux job as closely as msedgedriver's own constraints
-  # allow (see gui/e2e-tests/wdio.conf.js's own note on this).
+  # First real run (PR #65) confirmed the prediction below: it failed in
+  # exactly the predicted step, msedgedriver-matching, but not for the
+  # reason guessed (Program Files path / Edge channel were both fine -
+  # windows-latest's Edge version was read correctly). Real cause:
+  # msedgedriver.azureedge.net no longer resolves at all ("No such host is
+  # known") - Microsoft has since moved Edge WebDriver downloads to
+  # msedgedriver.microsoft.com, confirmed with a real HTTP 200 + matching
+  # edgedriver_win64.zip for the exact Edge version (150.0.4078.65) the
+  # failed run detected. Fixed below. The app/wdio.conf.js side was not the
+  # problem, as predicted - this only needed the download host corrected.
   e2e-windows:
     runs-on: windows-latest
     strategy:
@@ -105,7 +105,7 @@ jobs:
           Write-Host "Detected Microsoft Edge version: $edgeVersion"
           $zipPath = Join-Path $env:RUNNER_TEMP 'edgedriver.zip'
           $destDir = Join-Path $env:RUNNER_TEMP 'edgedriver'
-          Invoke-WebRequest -Uri "https://msedgedriver.azureedge.net/$edgeVersion/edgedriver_win64.zip" -OutFile $zipPath
+          Invoke-WebRequest -Uri "https://msedgedriver.microsoft.com/$edgeVersion/edgedriver_win64.zip" -OutFile $zipPath
           Expand-Archive -Path $zipPath -DestinationPath $destDir
           $driverPath = Join-Path $destDir 'msedgedriver.exe'
           "TAURI_DRIVER_NATIVE_DRIVER=$driverPath" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
